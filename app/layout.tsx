@@ -9,6 +9,9 @@ import { ThemeProvider } from "next-themes";
 // clerk
 import { ClerkProvider } from "@clerk/nextjs";
 
+// toast
+import { Toaster } from "@/components/ui/sonner";
+
 const interFont = Inter({
   subsets: ["latin"],
 });
@@ -42,6 +45,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
+            <Toaster position="top-center" />
           </ThemeProvider>
         </body>
       </html>
