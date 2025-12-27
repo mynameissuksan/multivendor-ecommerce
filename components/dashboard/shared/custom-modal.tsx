@@ -30,6 +30,7 @@ const CustomModal = ({
 // maxWidth,
 Props) => {
   const { isOpen, setClose } = useModal();
+
   return (
     <Dialog
       open={

@@ -20,6 +20,7 @@ const AdminCategoriesPage = async () => {
       actionButtonText="Create Ccategory"
       modalChildren={<CategoryDetail />}
       columns={columns}
+      newTabLink="/dashboard/admin/categories/new"
     />
   );
 };

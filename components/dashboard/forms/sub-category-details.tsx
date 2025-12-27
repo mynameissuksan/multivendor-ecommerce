@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import ImageUpload from "../shared/image-upload";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { SubCategoryModel } from "@/models/sub-category-model";
+import { NestedSubCategories } from "@/models/sub-category-model";
 import { upsertSubCategory } from "@/queries/sub-category";
 import { CategoryModel } from "@/models/category-model";
 import {
@@ -44,8 +44,8 @@ import {
 } from "@/components/ui/select";
 
 interface SubCategoryDetailsProps {
-  data?: SubCategoryModel;
-  categories: CategoryModel[];
+  data?: NestedSubCategories;
+  categories?: CategoryModel[];
 }
 
 const SubCategoryDetail: React.FC<SubCategoryDetailsProps> = ({
@@ -86,7 +86,7 @@ const SubCategoryDetail: React.FC<SubCategoryDetailsProps> = ({
   ) => {
     try {
       const response = await upsertSubCategory({
-        id: data?.id,
+        id: data!.id,
         name: values.name,
         image: values.image.length > 0 ? values.image[0].url : "",
         url: values.url,
@@ -199,7 +199,7 @@ const SubCategoryDetail: React.FC<SubCategoryDetailsProps> = ({
                     <Select
                       defaultValue={field.value}
                       value={field.value}
-                      disabled={isLoading || categories.length === 0}
+                      disabled={isLoading || categories?.length === 0}
                       onValueChange={field.onChange}
                     >
                       <SelectTrigger className="w-45">
@@ -208,7 +208,7 @@ const SubCategoryDetail: React.FC<SubCategoryDetailsProps> = ({
                       <SelectContent>
                         <SelectGroup>
                           <SelectLabel>Category</SelectLabel>
-                          {categories.map((category, index) => (
+                          {categories?.map((category, index) => (
                             <SelectItem value={category.id} key={index}>
                               {category.name}
                             </SelectItem>

@@ -1,11 +1,11 @@
 "use server";
 
 import {
+  GetAllSubCategoriesModel,
   SubCategoryModel,
   SubCategoryResultModel,
 } from "./../models/sub-category-model";
 import { pool } from "@/lib/config/db";
-import { CategoryModel } from "@/models/category-model";
 import { SubCategoryInput } from "@/models/sub-category-model";
 import { currentUser } from "@clerk/nextjs/server";
 
@@ -70,16 +70,49 @@ export const upsertSubCategory = async (subCategory: SubCategoryInput) => {
   }
 };
 
-export const getAllCategories = async () => {
-  const [subCategories] = await pool.query<CategoryModel[]>(
-    "SELECT * FROM sub_categories ORDER BY updated_at DESC"
+export const getAllSubCategories = async () => {
+  const [subCategories] = await pool.query<GetAllSubCategoriesModel[]>(
+    `SELECT
+      sub_categories.id            AS subId,
+      sub_categories.name          AS subName,
+      sub_categories.image         AS subImage,
+      sub_categories.url           AS subUrl,
+      sub_categories.featured      AS subFeatured,
+      sub_categories.category_id   AS categoryId,
+
+      categories.id                AS catId,
+      categories.name              AS catName,
+      categories.image             AS catImage,
+      categories.url               AS catUrl,
+      categories.featured          AS catFeatured
+
+      FROM sub_categories
+      INNER JOIN categories
+        ON categories.id = sub_categories.category_id
+      ORDER BY sub_categories.updated_at DESC;
+`
   );
-  return subCategories;
+  const result = subCategories.map((row) => ({
+    id: row.subId,
+    name: row.subName,
+    image: row.subImage,
+    url: row.subUrl,
+    featured: !!row.subFeatured,
+    categoryId: row.categoryId,
+    category: {
+      id: row.catId,
+      name: row.catName,
+      image: row.catImage,
+      url: row.catUrl,
+      featured: !!row.catfe,
+    },
+  }));
+  return result;
 };
 
-export const getCategory = async (subCategoryId: string) => {
-  if (!subCategoryId) throw new Error("Please provide category ID");
-  const [subCategory] = await pool.query<CategoryModel[]>(
+export const getSubCategory = async (subCategoryId: string) => {
+  if (!subCategoryId) throw new Error("Please provide sub category ID");
+  const [subCategory] = await pool.query<SubCategoryModel[]>(
     "SELECT * FROM sub_categories WHERE id = ?",
     [subCategoryId]
   );

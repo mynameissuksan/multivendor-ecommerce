@@ -1,47 +1,50 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { UserModel } from "@/models/user-model";
-import React, { ReactNode, useContext, useEffect, useState } from "react";
-
-export type ModalData = {
-  user?: UserModel;
-};
+// React, Next.js
+import { createContext, useContext, useEffect, useState } from "react";
 
 interface ModalProviderProps {
   children: React.ReactNode;
 }
 
-interface ModalContextType {
+export type ModalData = {
+  user?: UserModel;
+};
+type ModalContextType = {
   data: ModalData;
   isOpen: boolean;
-  setOpen: (modal: React.ReactNode, fetchData?: () => void) => void;
+  setOpen: (modal: React.ReactNode, fetchData?: () => Promise<any>) => void;
   setClose: () => void;
-}
+};
 
-export const ModalContext = React.createContext<ModalContextType>({
+export const ModalContext = createContext<ModalContextType>({
   data: {},
   isOpen: false,
-  setOpen: (modal: React.ReactNode, fetchData?: () => void) => {},
+  setOpen: (modal: React.ReactNode, fetchData?: () => Promise<any>) => {},
   setClose: () => {},
 });
 
 const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [data, setData] = useState<ModalData>({});
   const [showingModal, setShowingModal] = useState<React.ReactNode>(null);
-  const [isMounted, setIsMounted] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const setOpen = async (modal: ReactNode, fetchData?: () => void) => {
+  const setOpen = async (
+    modal: React.ReactNode,
+    fetchData?: () => Promise<any>
+  ) => {
     if (modal) {
       if (fetchData) {
+        // setData({ ...data, ...(await fetchData()) } || {});
       }
-
       setShowingModal(modal);
       setIsOpen(true);
     }
@@ -53,6 +56,7 @@ const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
   };
 
   if (!isMounted) return null;
+
   return (
     <ModalContext.Provider value={{ data, setOpen, setClose, isOpen }}>
       {children}

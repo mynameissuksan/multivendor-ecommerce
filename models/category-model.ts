@@ -6,7 +6,6 @@ export interface CategoryModel extends RowDataPacket {
   image: string;
   url?: string;
   featured?: boolean;
-  updatedAt?: Date;
 }
 
 export interface CategoryResultModel extends ResultSetHeader {
