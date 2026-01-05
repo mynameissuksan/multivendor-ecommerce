@@ -1,8 +1,30 @@
-import { RowDataPacket } from "mysql2";
+import { ResultSetHeader, RowDataPacket } from "mysql2";
+
+export interface StoreModelInput {
+  id?: string;
+  user_id?: string;
+  name: string;
+  description: string;
+  email: string;
+  phone: string;
+  url: string;
+  cover: string;
+  logo: string;
+  status?: string;
+  average_rating?: number;
+  featured: boolean;
+  return_policy?: string;
+  default_shipping_service?: string;
+  default_shipping_fees?: string;
+  default_delivery_time_min?: number;
+  default_delivery_time_max?: number;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface StoreModel extends RowDataPacket {
   id: string;
-  userId: string;
+  user_id: string;
   name: string;
   description: string;
   email: string;
@@ -11,13 +33,35 @@ export interface StoreModel extends RowDataPacket {
   cover: string;
   logo: string;
   status: string;
-  averageRating: number;
+  average_rating: number;
   featured: boolean;
-  returnPolicy: string;
-  defaultShippingService: string;
-  defaultShippingFees: string;
-  defaultDeliveryTimeMin: number;
-  defaultDeliveryTimeXax: number;
-  createdAt: string;
-  updatedAt: string;
+  return_policy: string;
+  default_shipping_service: string;
+  default_shipping_fees: string;
+  default_delivery_time_min: number;
+  default_delivery_time_max: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoreResultModel extends ResultSetHeader {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  email: string;
+  phone: string;
+  url: string;
+  cover: string;
+  logo: string;
+  status: string;
+  average_rating: number;
+  featured: boolean;
+  return_policy: string;
+  default_shipping_service: string;
+  default_shipping_fees: string;
+  default_delivery_time_min: number;
+  default_delivery_time_max: number;
+  created_at: string;
+  updated_at: string;
 }

@@ -27,12 +27,12 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import ImageUpload from "../shared/image-upload";
-import { upsertCategory } from "@/queries/category";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { StoreFormSchema } from "@/lib/schemas";
 import { StoreModel } from "@/models/store-model";
 import { Textarea } from "@/components/ui/textarea";
+import { upsertStore } from "@/queries/store";
 
 interface CategoryDetailsProps {
   data?: StoreModel;
@@ -52,8 +52,8 @@ const StoreDetails: React.FC<CategoryDetailsProps> = ({ data }) => {
       logo: data?.logo ? [{ url: data.logo }] : [],
       cover: data?.cover ? [{ url: data.cover }] : [],
       url: data?.url,
-      featured: data?.featured,
-      status: data?.status.toString(),
+
+      featured: data?.featured ? true : false,
     },
   });
   // Loading status base on form submission
@@ -69,28 +69,39 @@ const StoreDetails: React.FC<CategoryDetailsProps> = ({ data }) => {
         logo: [{ url: data.logo }],
         cover: [{ url: data.cover }],
         url: data?.url,
-        featured: data?.featured,
-        status: data?.status,
+        featured: data?.featured ? true : false,
       });
     }
   }, [data, form]);
 
   // submit handler for from submission
   const handleSubmit = async (values: z.infer<typeof StoreFormSchema>) => {
+    console.log("data", data?.user_id);
     try {
-      //   const response = await upsertCategory({});
+      await upsertStore({
+        id: data?.id,
+        name: values.name,
+        description: values.description,
+        email: values.email,
+        phone: values.phone,
+        logo: values.logo[0].url,
+        cover: values.cover[0].url,
+        url: values.url,
+        featured: values.featured,
+      });
 
       //   console.log("Response from upsertCategory:", response);
       toast("Success", {
         description: data?.id
-          ? "Category updated successfully"
-          : "Category created successfully",
+          ? "Store updated successfully"
+          : "Store created successfully",
       });
 
       if (data?.id) {
+        console.log('Refrsh')
         router.refresh();
       } else {
-        router.push("/dashboard/admin/categories");
+        router.push(`/dashboard/seller/stores/${values.url ?? data?.url}`);
       }
     } catch (error: any) {
       toast("Error", {
@@ -278,7 +289,7 @@ const StoreDetails: React.FC<CategoryDetailsProps> = ({ data }) => {
                     <div className="space-y-1 leading-none">
                       <FormLabel>Featured</FormLabel>
                       <FormDescription>
-                        This store will appear on the home page
+                        This Store will appear on the home page.
                       </FormDescription>
                     </div>
                   </FormItem>

@@ -8,19 +8,21 @@ import {
 } from "@/constants/data";
 import SidebarNavSeller from "./nav-seller";
 import { StoreModel } from "@/models/store-model";
+import StoreSwitcher from "./store-switcher";
 
 interface SidebarProps {
   isAdmin?: boolean;
   stores?: StoreModel[];
 }
 
-const Sidebar: React.FC<SidebarProps> = async ({ isAdmin }) => {
+const Sidebar: React.FC<SidebarProps> = async ({ isAdmin, stores }) => {
   const user = await currentUser();
   return (
     <div className="w-75 border-r h-screen p-4 flex flex-col fixed top-0 left-0 bottom-0">
       <Logo width="100%" height="100px" />
       <span className="mt-3" />
       {user && <UserInfo user={user} />}
+      {!isAdmin && stores && <StoreSwitcher stores={stores} />}
       {isAdmin ? (
         <SidebarNavAdmin menuLinks={adminDashboardSidebarOptions} />
       ) : (

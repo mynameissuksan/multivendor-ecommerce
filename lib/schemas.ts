@@ -86,6 +86,8 @@ export const StoreFormSchema = z.object({
       error:
         "Only letters, numbers, hyphen, and underscore are allowed in the store url, and consecutive occurrences of hyphens, underscores, or spaces are not permitted.",
     }),
-  featured: z.boolean().default(false).optional(),
+  featured: z.boolean(),
   status: z.string().default("PENDING").optional(),
 });
+
+
