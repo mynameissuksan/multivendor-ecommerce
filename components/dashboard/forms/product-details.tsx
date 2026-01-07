@@ -17,7 +17,6 @@ import { useEffect, useState } from "react";
 import {
   Form,
   FormControl,
-
   FormField,
   FormItem,
   FormLabel,
@@ -32,6 +31,7 @@ import { CategoryModel } from "@/models/category-model";
 import { ProductFormSchema } from "@/lib/schema/product-schema";
 import { ProductModelInput } from "@/models/product-model";
 import ImagePreviewGrid from "../shared/images-preview-grid";
+import ClickToAddInputs from "./click-to-add";
 
 interface ProductDetailsProps {
   data?: ProductModelInput; // store info
@@ -44,10 +44,12 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
   categories,
   storeUrl,
 }) => {
+  // State for colors
   const [colors, setColors] = useState<{ color: string }[]>([{ color: "" }]);
-  const [images, setImages] = useState<{ url: string }[]>([{ url: "" }]);
-
+  // const [images, setImages] = useState<{ url: string }[]>([{ url: "" }]);
   const router = useRouter();
+
+  // console.log("Color watch", colors);
 
   const form = useForm<z.infer<typeof ProductFormSchema>>({
     mode: "onChange",
@@ -112,6 +114,13 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
     }
   };
 
+  // Whenever colors, sizes, keywords changes we update the form values
+  useEffect(() => {
+    form.setValue("colors", colors);
+  }, [colors, form]);
+
+  console.log("form colors ---->", form.getValues().colors);
+
   return (
     <AlertDialog>
       <Card className="w-ful">
@@ -139,12 +148,14 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                       <FormControl>
                         <div>
                           <ImagePreviewGrid
+                            colors={colors}
+                            setColors={setColors}
                             images={field.value}
-                            onRemove={(url) =>
+                            onRemove={(url) => {
                               field.onChange(
                                 field.value.filter((img) => img.url !== url)
-                              )
-                            }
+                              );
+                            }}
                           />
 
                           <FormMessage className="ml-6" />
@@ -170,7 +181,17 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                     </FormItem>
                   )}
                 />
+                {/* Colors */}
+                <div className="w-full flex flex-col gap-y-3 xl:pl-5">
+                  <ClickToAddInputs
+                    details={colors}
+                    setDetails={setColors}
+                    initialDetail={{ color: "" }}
+                    header="Colors"
+                  />
+                </div>
               </div>
+
               {/* Name  */}
               <FormField
                 control={form.control}
