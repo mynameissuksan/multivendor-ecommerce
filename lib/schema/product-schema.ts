@@ -7,17 +7,13 @@ export const ProductFormSchema = z.object({
       message: "Product name must be a valid text.",
     })
     .min(2, { message: "Product name should be at least 2 characters long." })
-    .max(200, { message: "Product name cannot exceed 200 characters." })
-    .regex(/^(?!.*(?:[-_ ]){2,})[a-zA-Z0-9_ -]+$/, {
-      message:
-        "Product name may only contain letters, numbers, spaces, hyphens, and underscores, without consecutive special characters.",
-    }),
+    .max(200, { message: "Product name cannot exceed 200 characters." }),
   description: z
     .string({
       message: "Product description must be a valid text.",
     })
-    .min(200, {
-      message: "Product description should be at least 200 characters long.",
+    .min(30, {
+      message: "Product description should be at least 30 characters long.",
     }),
   variantName: z
     .string({
@@ -44,7 +40,7 @@ export const ProductFormSchema = z.object({
   variantImage: z
     .object({ url: z.string() })
     .array()
-    .length(1, "Choose a product variant image."),
+    .length(1, { message: "Choose a product variant image." }),
   categoryId: z
     .string({
       message: "Product category ID must be a valid UUID.",
@@ -55,12 +51,7 @@ export const ProductFormSchema = z.object({
       message: "Product sub-category ID must be a valid UUID.",
     })
     .uuid(),
-  offerTagId: z
-    .string({
-      message: "Product offer tag ID must be a valid UUID.",
-    })
-    .uuid()
-    .optional(),
+
   brand: z
     .string({
       message: "Product brand must be a valid text.",
@@ -81,9 +72,6 @@ export const ProductFormSchema = z.object({
     .max(50, {
       message: "Product SKU cannot exceed 50 characters.",
     }),
-  weight: z.number().min(0.01, {
-    message: "Please provide a valid product weight.",
-  }),
   keywords: z
     .string({
       message: "Keywords must be valid text.",
@@ -126,57 +114,40 @@ export const ProductFormSchema = z.object({
       value: z.string(),
     })
     .array()
-    .min(1, "Please provide at least one product spec.")
-    .refine(
-      (product_specs) =>
-        product_specs.every((s) => s.name.length > 0 && s.value.length > 0),
-      {
-        message: "All product specs inputs must be filled correctly.",
-      }
-    ),
+    .min(1, {
+      message: "Please provide at least one product spac.",
+    })
+    .refine((ps) => ps.every((s) => s.name.length > 0 && s.value.length > 0), {
+      message: "All product specs inputs must be filled correctly.",
+    }),
   variant_specs: z
     .object({
       name: z.string(),
       value: z.string(),
     })
     .array()
-    .min(1, "Please provide at least one product variant spec.")
-    .refine(
-      (product_specs) =>
-        product_specs.every((s) => s.name.length > 0 && s.value.length > 0),
-      {
-        message: "All product variant specs inputs must be filled correctly.",
-      }
-    ),
+    .min(1, {
+      message: "Please provide at least one variant spac.",
+    })
+    .refine((vs) => vs.every((s) => s.name.length > 0 && s.value.length > 0), {
+      message: "All variant specs inputs must be filled correctly.",
+    }),
+  isSale: z.boolean().default(false).optional(),
+  saleEndDate: z.string().optional(),
   questions: z
     .object({
       question: z.string(),
       answer: z.string(),
     })
     .array()
-    .min(1, "Please provide at least one product question.")
+    .min(1, {
+      message: "Please provide at least one question.",
+    })
     .refine(
-      (questions) =>
-        questions.every((q) => q.question.length > 0 && q.answer.length > 0),
+      (question) =>
+        question.every((q) => q.question.length > 0 && q.answer.length > 0),
       {
         message: "All product question inputs must be filled correctly.",
       }
     ),
-  isSale: z.boolean(),
-  saleEndDate: z.string().optional(),
-  freeShippingForAllCountries: z.boolean(),
-  freeShippingCountriesIds: z
-    .object({
-      id: z.string().optional(),
-      label: z.string(),
-      value: z.string(),
-    })
-    .array()
-    .optional()
-    .refine(
-      (ids) => ids?.every((item) => item.label && item.value),
-      "Each country must have a valid name and ID."
-    ),
-
-  //   shippingFeeMethod: z.nativeEnum(ShippingFeeMethod),
 });

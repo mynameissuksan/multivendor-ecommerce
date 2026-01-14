@@ -1,7 +1,7 @@
 import ThemeToggle from "@/components/shared/theme-toggle";
 import { UserButton } from "@clerk/nextjs";
 
-const Home = () => {
+const Home = async () => {
   return (
     <div className="p-5">
       <div className="w-full flex justify-end space-x-5">

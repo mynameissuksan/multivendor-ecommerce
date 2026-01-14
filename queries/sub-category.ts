@@ -135,3 +135,21 @@ export const deleteSubCategory = async (subCategoryId: string) => {
   );
   return { ...result };
 };
+
+// Functoin getAllSubCategoriesForCategory
+// Description: Retrives all subCategories for a category from the database
+export const getAllSubCategoriesForCategory = async (categoryId: string) => {
+  const [subCategories] = await pool.query<SubCategoryModel[]>(
+    "SELECT * FROM sub_categories WHERE category_id = ? ORDER BY updated_at DESC",
+    [categoryId]
+  );
+  return subCategories;
+};
+
+export const getSubCategoryById = async (subCategoryId: string) => {
+  const [subCategories] = await pool.query<SubCategoryModel[]>(
+    "SELECT * FROM sub_categories WHERE id = ? ORDER BY updated_at DESC",
+    [subCategoryId]
+  );
+  return subCategories;
+};

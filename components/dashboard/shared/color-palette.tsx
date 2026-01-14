@@ -15,7 +15,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
 
   // Handle component for individual color block
   const handleAddProdcutColor = (color: string) => {
-    if (!color || !setColors) return;
+    if (!color && !setColors) return;
 
     // Ensure colorsData is not undefined, defaulting to any empty array if it is
     const currentColorsData = colors ?? [];
@@ -26,13 +26,11 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
 
     // Check for empty inputs and remove them
     const newColors = currentColorsData.filter((c) => c.color !== "");
-    if (newColors.length === 0) return;
 
     // add the new color to colorsData
     setColors([...newColors, { color: color }]);
- 
 
-    console.log("test", [...newColors, { color: color }]);
+    // console.log("test", [...newColors, { color: color }]);
   };
 
   // Color component for individual color block

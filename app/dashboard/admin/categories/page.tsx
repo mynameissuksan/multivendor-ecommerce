@@ -17,7 +17,7 @@ const AdminCategoriesPage = async () => {
       searchPlaceholder="search category"
       filterValue="name"
       data={categories}
-      actionButtonText="Create Ccategory"
+      actionButtonText="Create Category"
       modalChildren={<CategoryDetail />}
       columns={columns}
       newTabLink="/dashboard/admin/categories/new"

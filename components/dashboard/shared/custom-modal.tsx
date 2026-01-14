@@ -31,6 +31,8 @@ const CustomModal = ({
 Props) => {
   const { isOpen, setClose } = useModal();
 
+  console.log('Modal')
+
   return (
     <Dialog
       open={

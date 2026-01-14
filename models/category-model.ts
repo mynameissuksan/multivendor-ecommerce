@@ -19,8 +19,8 @@ export interface CategoryResultModel extends ResultSetHeader {
 // สำหรับ input เมื่อสร้างหรืออัพเดท category
 export interface CategoryInput {
   id?: string;
-  name: string;
-  image: string;
-  url: string;
-  featured: boolean;
+  name?: string;
+  image?: string;
+  url?: string;
+  featured?: boolean;
 }

@@ -1,18 +1,19 @@
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 
+
 export interface StoreModelInput {
   id?: string;
   user_id?: string;
   name: string;
-  description: string;
-  email: string;
-  phone: string;
+  description?: string;
+  email?: string;
+  phone?: string;
   url: string;
-  cover: string;
-  logo: string;
+  cover?: string;
+  logo?: string;
   status?: string;
   average_rating?: number;
-  featured: boolean;
+  featured?: boolean;
   return_policy?: string;
   default_shipping_service?: string;
   default_shipping_fees?: string;
@@ -65,3 +66,11 @@ export interface StoreResultModel extends ResultSetHeader {
   created_at: string;
   updated_at: string;
 }
+
+// export interface NestedProductStoreModel {
+//   store: StoreModelInput;
+//   product: ProductModelInput[];
+//   sub_category: SubCategoryInput[];
+//   category: CategoryInput[];
+
+// }

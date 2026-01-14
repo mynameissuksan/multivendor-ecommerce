@@ -57,7 +57,7 @@ const ImagesPreviewGrid: FC<ImagesPreviewGridProps> = ({
     }
   }, [images, imagesLength]);
 
-  console.log("colorPalettes--->", colorPalettes);
+  // console.log("colorPalettes--->", colorPalettes);
 
   // If there are no images, display a placeholder image
   if (imagesLength === 0) {

@@ -7,26 +7,31 @@ export interface ProductModelInput {
   stores?: StoreModelInput;
   categories?: CategoryInput;
   product_varian: ProductVariantModelInput[];
+  product_specs?: ProductSpecsModel[];
+  questions?: QuestionsModel[];
   sub_categories?: SubCategoryInput;
   name: string;
   description?: string;
-  slug: string;
+  slug?: string;
   brand: string;
-  rating: number;
-  created_at: string;
-  updated_at: string;
+  rating?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ProductVariantModelInput {
   id?: string;
   sizes?: ProductSizeModelInput[];
   colors?: ProductColorsModelInput[];
-  images?: ProductVariantImagesModelInput[];
-  name?: string;
+  images: ProductVariantImagesModelInput[];
+  variant_specs?: VariantSpecsModel[];
+  name: string;
+  variant_image?: string;
   description?: string;
   slug?: string;
   keywords?: string[];
-  is_sale: boolean;
+  is_sale?: boolean;
+  sale_end_date?: string;
   sku?: string;
   created_at?: string;
   updated_at?: string;
@@ -34,19 +39,18 @@ export interface ProductVariantModelInput {
 
 export interface ProductSizeModelInput {
   id?: string;
-  name: string;
-  product_variant_images: ProductVariantImagesModelInput[];
+  product_variant_images?: ProductVariantImagesModelInput[];
   size: string;
   quantity: number;
   price: number;
   discount: number;
-  created_at: string;
-  udpated_at: string;
+  created_at?: string;
+  udpated_at?: string;
 }
 
 export interface ProductVariantImagesModelInput {
-  id: string;
-  url?: string;
+  id?: string;
+  url: string;
   alt?: string;
   created_at?: string;
   updated_at?: string;
@@ -59,4 +63,22 @@ export interface ProductColorsModelInput {
   products_variant_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+interface ProductSpecsModel {
+  id?: string;
+  name: string;
+  value: string;
+}
+
+interface VariantSpecsModel {
+  id?: string;
+  name: string;
+  value: string;
+}
+
+interface QuestionsModel {
+  id?: string;
+  question: string;
+  answer: string;
 }

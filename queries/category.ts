@@ -6,7 +6,9 @@ import {
   CategoryResultModel,
 } from "./../models/category-model";
 import { pool } from "@/lib/config/db";
+import { SubCategoryModel } from "@/models/sub-category-model";
 import { currentUser } from "@clerk/nextjs/server";
+import { RowDataPacket } from "mysql2";
 
 export const upsertCategory = async (category: CategoryInput) => {
   try {
@@ -62,7 +64,7 @@ export const upsertCategory = async (category: CategoryInput) => {
 };
 
 export const getAllCategories = async () => {
-  const [categories] = await pool.query<CategoryModel[]>(
+  const [categories] = await pool.query<(CategoryModel & RowDataPacket)[]>(
     "SELECT * FROM categories ORDER BY updated_at DESC"
   );
   return categories;
@@ -70,7 +72,7 @@ export const getAllCategories = async () => {
 
 export const getCategory = async (categoryId: string) => {
   if (!categoryId) throw new Error("Please provide category ID");
-  const [category] = await pool.query<CategoryModel[]>(
+  const [category] = await pool.query<(CategoryModel & RowDataPacket)[]>(
     "SELECT * FROM categories WHERE id = ?",
     [categoryId]
   );

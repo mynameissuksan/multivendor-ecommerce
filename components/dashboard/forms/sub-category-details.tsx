@@ -86,7 +86,7 @@ const SubCategoryDetail: React.FC<SubCategoryDetailsProps> = ({
   ) => {
     try {
       const response = await upsertSubCategory({
-        id: data!.id,
+        id: data?.id,
         name: values.name,
         image: values.image.length > 0 ? values.image[0].url : "",
         url: values.url,

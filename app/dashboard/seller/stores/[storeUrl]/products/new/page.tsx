@@ -4,15 +4,13 @@ import { getAllCategories } from "@/queries/category";
 const SellerNewProductPage = async ({
   params,
 }: {
-  params: { storeUrl: string };
+  params: Promise<{ storeUrl: string }>;
 }) => {
   const categories = await getAllCategories();
+  const { storeUrl } = await params;
   return (
     <div className="w-full">
-      <ProductDetails
-        categories={categories}
-        storeUrl={params.storeUrl}
-      />
+      <ProductDetails categories={categories} storeUrl={storeUrl} />
     </div>
   );
 };

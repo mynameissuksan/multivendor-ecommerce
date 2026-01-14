@@ -54,11 +54,11 @@ export interface SubCategoryResultModel extends ResultSetHeader {
 
 // สำหรับ input เมื่อสร้างหรืออัพเดท sub category
 export interface SubCategoryInput {
-  id: string;
-  name: string;
-  image: string;
-  url: string;
-  featured: boolean;
-  categoryId: string;
+  id?: string;
+  name?: string;
+  image?: string;
+  url?: string;
+  featured?: boolean;
+  categoryId?: string;
   category?: CategoryInput;
 }

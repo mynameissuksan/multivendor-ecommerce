@@ -81,7 +81,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     });
 
     setPendingImages((prev) => [...prev, ...newPendingImages]);
-    e.target.value = "";
+    // e.target.value = "";
   };
 
   // Remove pending image
