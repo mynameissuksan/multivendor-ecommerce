@@ -86,6 +86,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
     ]
   );
 
+
+
   // console.log('Product size',sizes)
 
   // state for product specs

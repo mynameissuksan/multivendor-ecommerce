@@ -4,11 +4,11 @@ import { ResultSetHeader, RowDataPacket } from "mysql2";
 export interface StoreModelInput {
   id?: string;
   user_id?: string;
-  name: string;
+  name?: string;
   description?: string;
   email?: string;
   phone?: string;
-  url: string;
+  url?: string;
   cover?: string;
   logo?: string;
   status?: string;
@@ -16,9 +16,13 @@ export interface StoreModelInput {
   featured?: boolean;
   return_policy?: string;
   default_shipping_service?: string;
-  default_shipping_fees?: string;
+  default_shipping_fees?: number;
   default_delivery_time_min?: number;
   default_delivery_time_max?: number;
+  default_shipping_fee_per_item?: number;
+  default_shipping_fee_for_addional_item?: number;
+  default_shipping_fee_per_kg?: number;
+  default_shipping_fee_fixed?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -74,3 +78,5 @@ export interface StoreResultModel extends ResultSetHeader {
 //   category: CategoryInput[];
 
 // }
+
+

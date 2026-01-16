@@ -7,6 +7,7 @@ import {
   StoreResultModel,
 } from "@/models/store-model";
 import { currentUser } from "@clerk/nextjs/server";
+import { ResultSetHeader, RowDataPacket } from "mysql2";
 
 export const getAllStoreByUserId = async (userId: string) => {
   const [rows] = await pool.query<StoreModel[]>(
@@ -159,4 +160,95 @@ export const getStoreByUrl = async (url: string) => {
     [url]
   );
   return storeDetails[0];
+};
+
+// fetches the default shipping details for a store based on the store URL.
+export const getStoreDefaultShippingDetails = async (storeUrl: string) => {
+  // Ensure the store URL is provide
+  if (!storeUrl) {
+    throw new Error("Store URL is required.");
+  }
+
+  try {
+    const [store] = await pool.query<(StoreModelInput & RowDataPacket)[]>(
+      `SELECT 
+      default_shipping_service, 
+      default_delivery_time_min, 
+      default_delivery_time_max, 
+      default_shipping_fee_per_item, 
+      default_shipping_fee_for_addional_item,
+      default_shipping_fee_per_kg,
+      default_shipping_fee_fixed,
+      return_policy
+      FROM stores WHERE url = ? LIMIT 1`,
+      [storeUrl]
+    );
+
+    if (store.length === 0) throw new Error("Store not found");
+
+    return store[0];
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateStoreDefaultShippingDetails = async (
+  storeUrl: string,
+  details: StoreModelInput
+) => {
+  console.log("details ", details);
+
+  try {
+    const user = await currentUser();
+    if (!user) throw new Error("Unauthorized.");
+
+    if (user.privateMetadata.role !== "SELLER")
+      throw new Error("Unauthorized Access");
+
+    if (!storeUrl) throw new Error("No shipping details provide to update.");
+
+    // Make sure seller is updating their own store
+    const [check_ownership] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM stores WHERE url = ? AND user_id = ?",
+      [storeUrl, user.id]
+    );
+
+    if (check_ownership.length === 0)
+      throw new Error(
+        "Make sure you have the permissions to update this store"
+      );
+
+    // find and update the store based on storeUrl
+    const [updatedStore] = await pool.query<ResultSetHeader>(
+      `UPDATE stores SET 
+     default_shipping_service = ?, 
+     default_shipping_fee_per_item = ?,
+     default_shipping_fee_for_addional_item = ?,
+     default_shipping_fee_per_kg = ?,
+     default_delivery_time_max = ?,
+     default_delivery_time_min = ?,
+     default_shipping_fee_fixed = ?,
+     return_policy = ?,
+     updated_at = NOW()
+
+     WHERE url = ? AND user_id = ?`,
+      [
+        details.default_shipping_service,
+        details.default_shipping_fee_per_item,
+        details.default_shipping_fee_for_addional_item,
+        details.default_shipping_fee_per_kg,
+        details.default_delivery_time_max,
+        details.default_delivery_time_min,
+        details.default_shipping_fee_fixed,
+        details.return_policy,
+        storeUrl,
+        user.id,
+      ]
+    );
+    return {
+      ok: true,
+    };
+  } catch (error) {
+    throw error;
+  }
 };
