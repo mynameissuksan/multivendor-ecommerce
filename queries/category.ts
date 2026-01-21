@@ -6,7 +6,6 @@ import {
   CategoryResultModel,
 } from "./../models/category-model";
 import { pool } from "@/lib/config/db";
-import { SubCategoryModel } from "@/models/sub-category-model";
 import { currentUser } from "@clerk/nextjs/server";
 import { RowDataPacket } from "mysql2";
 

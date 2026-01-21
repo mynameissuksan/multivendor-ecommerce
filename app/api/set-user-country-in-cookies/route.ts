@@ -1,0 +1,29 @@
+import { NextResponse } from "next/server";
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { userCountry } = body;
+
+    //check if user country is provide
+    if (!userCountry) {
+      return new NextResponse("User country data not sent.", { status: 400 });
+    }
+
+    // set the cookie
+
+    const response = new NextResponse("User country data saved", {
+      status: 200,
+    });
+
+    response.cookies.set("userCountry", JSON.stringify(userCountry), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+
+    return response;
+  } catch (error) {
+    return new NextResponse(`Couldn't save data, ${error}`, { status: 500 });
+  }
+}

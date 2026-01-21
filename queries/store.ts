@@ -8,6 +8,8 @@ import {
 } from "@/models/store-model";
 import { currentUser } from "@clerk/nextjs/server";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
+import { permissionSeller } from "./permission";
+import { CountryWithShippingRateModel } from "@/models/shipping-model";
 
 export const getAllStoreByUserId = async (userId: string) => {
   const [rows] = await pool.query<StoreModel[]>(
@@ -172,6 +174,7 @@ export const getStoreDefaultShippingDetails = async (storeUrl: string) => {
   try {
     const [store] = await pool.query<(StoreModelInput & RowDataPacket)[]>(
       `SELECT 
+
       default_shipping_service, 
       default_delivery_time_min, 
       default_delivery_time_max, 
@@ -219,7 +222,7 @@ export const updateStoreDefaultShippingDetails = async (
       );
 
     // find and update the store based on storeUrl
-    const [updatedStore] = await pool.query<ResultSetHeader>(
+    await pool.query<ResultSetHeader>(
       `UPDATE stores SET 
      default_shipping_service = ?, 
      default_shipping_fee_per_item = ?,
@@ -247,6 +250,153 @@ export const updateStoreDefaultShippingDetails = async (
     );
     return {
       ok: true,
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Retrieves all countries and their shipping rates for s specificaiton store.
+// if a country does not have a shipping rate, it is still included in the
+export const getStoreShippingRates = async (storeUrl: string) => {
+  try {
+    const userId = await permissionSeller(storeUrl);
+
+    // Make sure seller is updating their own store
+    const [check_ownership] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM stores WHERE url = ? AND user_id = ? LIMIT 1",
+      [storeUrl, userId]
+    );
+
+    if (check_ownership.length === 0)
+      throw new Error(
+        "Make sure you have the permissions to udpate this store."
+      );
+
+    // Get store details
+    const [store] = await pool.query<RowDataPacket[]>(
+      "SELECT * FROM stores WHERE url = ? AND user_id = ? LIMIT 1",
+      [storeUrl, userId]
+    );
+
+    if (store.length === 0) throw new Error("Store could not be found.");
+
+    // Retrieve all countries
+    const [countries] = await pool.query<RowDataPacket[]>(
+      "SELECT id,name FROM countries ORDER BY name DESC"
+    );
+
+    // Retrieve all shipping rates for specified store
+    const [shippingRates] = await pool.query<RowDataPacket[]>(
+      "SELECT * FROM shipping_rates WHERE store_id = ?",
+      [store[0].id]
+    );
+
+    // create a map for quick lookup for shipping rates by country id
+    const rateMap = new Map();
+
+    shippingRates.forEach((rate) => {
+      rateMap.set(rate.country_id, rate);
+    });
+
+    const result = countries.map<CountryWithShippingRateModel>((country) => ({
+      countryId: country.id,
+      countryName: country.name,
+      shippingRate: rateMap.get(country.id) || null,
+    }));
+    return result;
+  } catch (error) {
+    throw error;
+  }
+};
+
+//
+export const upsertShippngRate = async (
+  storeUrl: string,
+  shippingRate: CountryWithShippingRateModel
+) => {
+  try {
+    const userId = await permissionSeller(storeUrl);
+
+    const [check_ownership] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM stores WHERE url = ? AND user_id = ?",
+      [storeUrl, userId]
+    );
+
+    if (check_ownership.length === 0)
+      throw new Error(
+        "Make sure you have the permissions to update this store"
+      );
+
+    if (!shippingRate) throw new Error("Please provide shipping rate data.");
+
+    if (!shippingRate.countryId)
+      throw new Error("Please provide a valid country ID.");
+
+    // get store id
+    const [store] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM stores WHERE url = ? AND user_id = ? LIMIT 1",
+      [storeUrl, userId]
+    );
+
+    if (store.length === 0)
+      throw new Error("Please provide a valid store URL.");
+
+    // upsert the shipping rate into the db
+    const shipping = shippingRate.shippingRate;
+
+    const columns = [
+      "country_id",
+      "shipping_service",
+      "shipping_fee_per_item",
+      "shipping_fee_additional_item",
+      "shipping_fee_per_kg",
+      "shipping_fee_fixed",
+      "delivery_time_min",
+      "delivery_time_max",
+      "return_policy",
+      "store_id",
+    ];
+
+    const values = [
+      shipping.country_id,
+      shipping.shipping_service,
+      shipping.shipping_fee_per_item,
+      shipping.shipping_fee_additional_item,
+      shipping.shipping_fee_per_kg,
+      shipping.shipping_fee_fixed,
+      shipping.delivery_time_min,
+      shipping.delivery_time_max,
+      shipping.return_policy,
+      store[0].id,
+    ];
+
+    const placeholder = columns.map(() => "?").join(", ");
+    const placeholderUpdate = columns.map((v) => `${v} = ?`).join(", ");
+
+    const [existing] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM shipping_rates WHERE country_id = ? LIMIT 1",
+      [shipping.country_id]
+    );
+
+    if (existing.length === 0) {
+      // insert
+      const sql = `INSERT INTO shipping_rates (${columns.join(
+        ", "
+      )}) VALUES (${placeholder})`;
+
+      await pool.query<ResultSetHeader>(sql, values);
+    } else {
+      // update
+      const sql = `UPDATE shipping_rates SET ${placeholderUpdate}, updated_at = NOW() WHERE country_id = '${shipping.country_id}'`;
+      await pool.query<ResultSetHeader>(sql, values);
+    }
+
+    return {
+      message:
+        existing.length === 0
+          ? "Store default shipping details has been added."
+          : "Store default shipping details has been updated.",
     };
   } catch (error) {
     throw error;

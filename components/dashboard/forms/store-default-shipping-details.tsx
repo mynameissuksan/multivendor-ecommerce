@@ -93,8 +93,6 @@ const StoreDefaultShippingDetails: React.FC<
         default_shipping_fee_fixed: values.defaultShippingFeeFixed,
       });
 
-      console.log("res ", res);
-
       toast("Success", {
         description: "Store default shipping details has been updated.",
       });

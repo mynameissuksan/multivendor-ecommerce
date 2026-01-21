@@ -15,6 +15,7 @@ interface DbUser extends RowDataPacket {
 export async function POST(req: NextRequest) {
   try {
     const evt = await verifyWebhook(req);
+    
 
     // when user is created or updated
     if (evt.type === "user.created" || evt.type === "user.updated") {
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
           ]
         );
       } else {
-        console.log("555 role = ", data.private_metadata.role);
+        // console.log("555 role = ", data.private_metadata.role);
 
         // update
         await pool.query(

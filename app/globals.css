@@ -246,3 +246,21 @@
 .perspactive-100 {
   perspective: 1000px;
 }
+
+
+/* User Button */
+.user-avatar  .cl-avatarBox {
+  width: 70px !important;
+  height: 70px !important;
+}
+
+
+/* Customer scollbar */
+.scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scrollbar::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 5px;
+}
