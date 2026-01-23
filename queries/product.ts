@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { pool } from "@/lib/config/db";
@@ -10,10 +11,13 @@ import slugify from "slugify";
 
 export const upsertProduct = async (
   product: ProductModelInput,
-  storeUrl: string
+  storeUrl: string,
 ) => {
   // console.log("product", product);
+  const conn = await pool.getConnection();
   try {
+    await conn.beginTransaction();
+
     const user = await currentUser();
     if (!user) throw new Error("Unauthenticated.");
 
@@ -30,9 +34,9 @@ export const upsertProduct = async (
     // );
 
     // find the store by url
-    const [storeRows] = await pool.query<StoreModel[]>(
+    const [storeRows] = await conn.query<StoreModel[]>(
       "SELECT * FROM stores WHERE url = ?",
-      [storeUrl]
+      [storeUrl],
     );
 
     if (storeRows.length === 0) throw new Error("Store not found");
@@ -45,7 +49,7 @@ export const upsertProduct = async (
         replacement: "-",
         trim: true,
       }),
-      "products"
+      "products",
     );
 
     const variantSlug = await generateUniqueSlug(
@@ -54,7 +58,7 @@ export const upsertProduct = async (
         replacement: "-",
         trim: true,
       }),
-      "products_variant"
+      "products_variant",
     );
 
     let productId: string;
@@ -62,7 +66,7 @@ export const upsertProduct = async (
 
     if (product?.id) {
       // Update existing product
-      await pool.query<ResultSetHeader>(
+      await conn.query<ResultSetHeader>(
         "UPDATE products SET name = ?, description = ?, slug = ?, brand = ?, category_id = ?, sub_category_id = ?, updated_at = NOW() WHERE id = ? ",
         [
           product.name,
@@ -72,12 +76,12 @@ export const upsertProduct = async (
           product.categories?.id,
           product.sub_categories?.id,
           product.id,
-        ]
+        ],
       );
       productId = product.id;
     } else {
       // Insert new product
-      await pool.query<ResultSetHeader>(
+      await conn.query<ResultSetHeader>(
         "INSERT INTO products (store_id, category_id, sub_category_id, name, description, slug, brand) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
           store.id,
@@ -87,31 +91,28 @@ export const upsertProduct = async (
           product.description,
           productSlug,
           product.brand,
-        ]
+        ],
       );
 
       // Get the inserted product ID
-      const [newProduct] = await pool.query<RowDataPacket[]>(
+      const [newProduct] = await conn.query<RowDataPacket[]>(
         "SELECT id FROM products WHERE slug = ? ORDER BY created_at DESC LIMIT 1",
-        [productSlug]
+        [productSlug],
       );
       productId = newProduct[0]?.id;
     }
 
     // --------------------- Upsert questions --------------------------------
-    const questions = product?.questions![0];
-    if (!questions) throw new Error("Product question is required");
-    if (questions.id) {
-      // updated
-      await pool.query<ResultSetHeader>(
-        "UPDATE questions SET question = ?, answer = ?, updated_at = NOW() WHERE id = ?",
-        [questions.question, questions.answer, questions.id]
-      );
-    } else {
-      // insert
-      await pool.query<ResultSetHeader>(
-        "INSERT INTO questions (question, answer, product_id) VALUES (?, ?, ?)",
-        [questions.question, questions.answer, productId]
+    await conn.query("DELETE FROM questions WHERE product_id = ?", [productId]);
+
+    const qs = (product.questions ?? []).filter((q) => q.question && q.answer);
+    if (qs.length > 0) {
+      const values = qs.map(() => "(?, ?, ?, NOW(), NOW())").join(", ");
+      const params = qs.flatMap((q) => [q.question, q.answer, productId]);
+      await conn.query(
+        `INSERT INTO questions (question, answer, product_id, created_at, updated_at)
+         VALUES ${values}`,
+        params,
       );
     }
 
@@ -122,7 +123,7 @@ export const upsertProduct = async (
     if (variant?.id) {
       // Updated existing variant
 
-      await pool.query<ResultSetHeader>(
+      await conn.query<ResultSetHeader>(
         "UPDATE products_variant SET name = ?, description = ?, slug = ?, keywords = ?, is_sale = ?, sku = ?, variant_image = ?, sale_end_date = ? WHERE id = ?",
         [
           variant.name,
@@ -134,14 +135,14 @@ export const upsertProduct = async (
           variant.variant_image,
           variant.sale_end_date,
           variant.id,
-        ]
+        ],
       );
 
       variantId = variant?.id;
     } else {
       // Insert new variant
 
-      await pool.query<ResultSetHeader>(
+      await conn.query<ResultSetHeader>(
         "INSERT INTO products_variant (product_id, name, description, slug, keywords, is_sale, sku, variant_image, sale_end_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           productId,
@@ -153,89 +154,108 @@ export const upsertProduct = async (
           variant.sku,
           variant.variant_image,
           variant.sale_end_date,
-        ]
+        ],
       );
 
-      const [newVariant] = await pool.query<RowDataPacket[]>(
+      const [newVariant] = await conn.query<RowDataPacket[]>(
         "SELECT id FROM products_variant WHERE slug = ? ORDER BY created_at DESC LIMIT 1",
-        [variantSlug]
+        [variantSlug],
       );
 
       variantId = newVariant[0].id;
     }
 
     // ----------------- Upsert Specs --------------------
-    const specs = product?.product_specs![0];
-    if (!specs) throw new Error("Specification is required");
 
-    if (specs.id) {
-      // updated
-      await pool.query<ResultSetHeader>(
-        `UPDATE spces SET name = ?, value = ?, updated_at = NOW() WHERE id = ?`,
-        [specs.name, specs.value, specs.id]
-      );
-    } else {
-      // insert
-      await pool.query<ResultSetHeader[]>(
-        "INSERT INTO specs (name, value, product_id, variant_id) VALUES (?, ?, ?, ?)",
-        [specs.name, specs.value, productId, variantId]
+    await conn.query(
+      "DELETE FROM spces WHERE product_id = ? AND variant_id = ?",
+      [productId, variantId],
+    );
+
+    const productSpecs = (product.product_specs ?? []).filter(
+      (s) => s.name && s.value,
+    );
+    if (productSpecs.length > 0) {
+      const values = productSpecs.map(() => "(?, ?, ?, ?)").join(", ");
+      const params = productSpecs.flatMap((s) => [
+        s.name,
+        s.value,
+        productId,
+        variantId,
+      ]);
+      await conn.query(
+        `INSERT INTO spces (name, value, product_id, variant_id)
+         VALUES ${values}`,
+        params,
       );
     }
 
     // ---------------------------- Handle Images -----------------------------------------
     if (variant.images && variant.images.length > 0) {
-      //  Delete old images
-      // await pool.query("DELETE FROM product_variant_images WHERE ")
+      await conn.query(
+        "DELETE FROM product_variant_images WHERE products_variant_id = ?",
+        [variantId],
+      );
 
-      const imageVariant = variant.images.map((img) => ({
-        variantId,
-        url: img.url,
-        alt: img.url?.split("/").pop() || "",
-      }));
-
-      //   if (imageVariant.length > 0) {
-      //     await connection.query(
-      //       `INSERT INTO products_variant_images
-      //        (id, product_variant_id, url, alt, created_at, updated_at)
-      //        VALUES ${imageVariant
-      //          .map(() => "(UUID(), ?, ?, ?, NOW(), NOW())")
-      //          .join(", ")}`,
-      //       imageVariant.flat()
-      //     );
-      //   }
-
-      for (let i = 0; i < imageVariant.length; i++) {
-        await pool.query<ResultSetHeader>(
-          "INSERT INTO product_variant_images (products_variant_id, url, alt) VALUES (?, ?, ?)",
-          [imageVariant[i].variantId, imageVariant[i].url, imageVariant[i].alt]
+      const imgs = (variant.images ?? []).filter((i) => i.url);
+      if (imgs.length > 0) {
+        const values = imgs
+          .map(() => "(UUID(), ?, ?, ?, NOW(), NOW())")
+          .join(", ");
+        const params = imgs.flatMap((i) => [
+          variantId,
+          i.url,
+          i.url.split("/").pop() ?? "",
+        ]);
+        await conn.query(
+          `INSERT INTO product_variant_images (id, products_variant_id, url, alt, created_at, updated_at)
+         VALUES ${values}`,
+          params,
         );
       }
     }
 
     // -------- Handle colors -------
-    if (variant.colors && variant.colors.length > 0) {
-      // Delete old colors
+    await conn.query("DELETE FROM colors WHERE products_variant_id = ?", [
+      variantId,
+    ]);
 
-      for (let i = 0; i < variant.colors.length; i++) {
-        await pool.query<ResultSetHeader>(
-          "INSERT INTO colors (products_variant_id, name) VALUES (?, ?)",
-          [variantId, variant.colors[i].name]
-        );
-      }
+    const cols = (variant.colors ?? []).filter((c) => c.name);
+    if (cols.length > 0) {
+      const values = cols.map(() => "(UUID(), ?, ?, NOW(), NOW())").join(", ");
+      const params = cols.flatMap((c) => [variantId, c.name]);
+      await conn.query(
+        `INSERT INTO colors (id, products_variant_id, name, created_at, updated_at)
+         VALUES ${values}`,
+        params,
+      );
     }
 
     // ------------ Sizes ----------------
-    if (variant.sizes && variant.sizes.length > 0) {
-      // Delete old sizes
+    await conn.query("DELETE FROM sizes WHERE products_variant_id = ?", [
+      variantId,
+    ]);
 
-      for (let i = 0; i < variant.sizes.length; i++) {
-        const size = variant.sizes[i];
-        await pool.query<ResultSetHeader>(
-          "INSERT INTO sizes (products_variant_id, size, quantity, price, discount) VALUES (?, ?, ?, ?, ?)",
-          [variantId, size.size, size.quantity, size.price, size.discount]
-        );
-      }
+    const sz = (variant.sizes ?? []).filter((s) => s.size);
+    if (sz.length > 0) {
+      const values = sz
+        .map(() => "(UUID(), ?, ?, ?, ?, ?, NOW(), NOW())")
+        .join(", ");
+      const params = sz.flatMap((s) => [
+        variantId,
+        s.size,
+        s.quantity,
+        s.price,
+        s.discount,
+      ]);
+      await conn.query(
+        `INSERT INTO sizes (id, products_variant_id, size, quantity, price, discount, created_at, updated_at)
+         VALUES ${values}`,
+        params,
+      );
     }
+
+    await conn.commit();
 
     return {
       status: true,
@@ -246,13 +266,18 @@ export const upsertProduct = async (
         : "Product created successfully",
     };
   } catch (error) {
+    await conn.rollback();
     throw error;
+  } finally {
+    conn.release();
   }
 };
 
+// get product by store
 export const getProductMainInfo = async (productId: string) => {
-  const [productRows] = await pool.query<RowDataPacket[]>(
-    `SELECT p.id, p.name, p.description, p.brand, c.id as category_id, s.id as sub_category_id, p.store_id,
+  try {
+    const [productRows] = await pool.query<RowDataPacket[]>(
+      `SELECT p.id, p.name, p.description, p.brand, c.id as category_id, s.id as sub_category_id, p.store_id,
      pv.id as pv_id,
      pv.name as pv_name,
      pv.variant_image as pv_image,
@@ -276,56 +301,59 @@ export const getProductMainInfo = async (productId: string) => {
      INNER JOIN products_variant pv ON pv.product_id = p.id
      INNER JOIN sizes ON sizes.products_variant_id = pv.id
      WHERE p.id = ? LIMIT 1`,
-    [productId]
-  );
+      [productId],
+    );
 
-  if (productRows.length === 0) return null;
+    if (productRows.length === 0) return null;
 
-  const product = productRows[0];
+    const product = productRows[0];
 
-  return {
-    id: product.id,
-    name: product.name,
-    description: product.description,
-    brand: product.brand,
-    product_varian: [
-      {
-        id: product.pv_id,
-        name: product.pv_name,
-        variant_image: product.pv_image,
-        description: product.pv_description,
-        slug: product.pv_slug,
-        keywords: product.pv_keywords,
-        is_sale: product.pv_is_sale,
-        sale_end_date: product.pv_sale_end_date,
-        sku: product.pv_sku,
-        sizes: [
-          {
-            size: product.size_name,
-            quantity: product.quantity,
-            price: product.price,
-            discount: product.discount,
-          },
-        ],
+    return {
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      brand: product.brand,
+      product_varian: [
+        {
+          id: product.pv_id,
+          name: product.pv_name,
+          variant_image: product.pv_image,
+          description: product.pv_description,
+          slug: product.pv_slug,
+          keywords: product.pv_keywords,
+          is_sale: product.pv_is_sale,
+          sale_end_date: product.pv_sale_end_date,
+          sku: product.pv_sku,
+          sizes: [
+            {
+              size: product.size_name,
+              quantity: product.quantity,
+              price: product.price,
+              discount: product.discount,
+            },
+          ],
+        },
+      ],
+      categories: {
+        id: product.category_id,
       },
-    ],
-    categories: {
-      id: product.category_id,
-    },
-    sub_categories: {
-      id: product.sub_category_id,
-    },
-    stores: {
-      id: product.store_id,
-    },
-  } as ProductModelInput;
+      sub_categories: {
+        id: product.sub_category_id,
+      },
+      stores: {
+        id: product.store_id,
+      },
+    } as ProductModelInput;
+  } catch (error) {
+    throw error;
+  }
 };
 
 // หา Store ID จาก URL
 async function getStoreIdByUrl(storeUrl: string): Promise<string> {
   const [rows] = await pool.query<RowDataPacket[]>(
     "SELECT id FROM stores WHERE url = ? LIMIT 1",
-    [storeUrl]
+    [storeUrl],
   );
 
   if (rows.length === 0) {
@@ -337,8 +365,11 @@ async function getStoreIdByUrl(storeUrl: string): Promise<string> {
 
 // Query products พร้อมข้อมูล related tables
 async function queryProducts(storeId: string) {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT 
+  const conn = await pool.getConnection();
+  await conn.beginTransaction();
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT 
        -- Product Info
        p.id AS product_id,
        p.name AS product_name,
@@ -380,10 +411,16 @@ async function queryProducts(storeId: string) {
      INNER JOIN stores s ON p.store_id = s.id
      WHERE s.id = ?
      ORDER BY p.id, pv.id`,
-    [storeId]
-  );
-
-  return rows;
+      [storeId],
+    );
+    await conn.commit();
+    return rows;
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 }
 
 // Query variant images สำหรับ variants ทั้งหมด
@@ -395,7 +432,7 @@ async function queryVariantImages(variantIds: string[]) {
     `SELECT id, products_variant_id, url, alt, created_at, updated_at
      FROM product_variant_images 
      WHERE products_variant_id IN (?)`,
-    [variantIds]
+    [variantIds],
   );
 
   return rows;
@@ -409,7 +446,7 @@ async function queryVariantColors(variantIds: string[]) {
     `SELECT id, products_variant_id, name, created_at, updated_at
      FROM colors 
      WHERE products_variant_id IN (?)`,
-    [variantIds]
+    [variantIds],
   );
 
   return rows;
@@ -424,19 +461,18 @@ async function queryVariantSizes(variantIds: string[]) {
     `SELECT id, products_variant_id, size, quantity, price, discount, created_at, updated_at
      FROM sizes 
      WHERE products_variant_id IN (?)`,
-    [variantIds]
+    [variantIds],
   );
 
   return rows;
 }
 
 // แปลง raw data เป็น ProductModelInput
-
 function mapProductsData(
   productRows: RowDataPacket[],
   images: RowDataPacket[],
   colors: RowDataPacket[],
-  sizes: RowDataPacket[]
+  sizes: RowDataPacket[],
 ): ProductModelInput[] {
   // สร้าง Map เพื่อ group products
   const productMap = new Map<string, ProductModelInput>();
@@ -480,7 +516,7 @@ function mapProductsData(
 
     // เช็คว่า variant นี้มีอยู่แล้วหรือยัง (กรณีที่ join ซ้ำ)
     const variantExists = product.product_varian.some(
-      (v) => v.id === row.variant_id
+      (v) => v.id === row.variant_id,
     );
 
     if (!variantExists) {
@@ -536,7 +572,7 @@ function mapProductsData(
 
 //  ดึงข้อมูล products ทั้งหมดของ store พร้อม variants, images, colors, sizes
 export async function getAllStoreProducts(
-  storeUrl: string
+  storeUrl: string,
 ): Promise<ProductModelInput[]> {
   try {
     // 1. หา Store ID
@@ -593,11 +629,49 @@ export const deleteProduct = async (productId: string) => {
 
     const [res] = await pool.query<ResultSetHeader>(
       "DELETE FROM products WHERE id = ?",
-      [productId]
+      [productId],
     );
 
     return res;
   } catch (error) {
     throw error;
   }
+};
+
+export const getProducts = async (
+  filters: any = {},
+  sortBy: string = "",
+  page: number = 1,
+  pageSize: number = 10,
+) => {
+  const currentPage = Math.max(1, page);
+  const limit = Math.max(1, Math.min(pageSize, 50));
+  const offset = (currentPage - 1) * limit;
+
+  const sql = `
+    SELECT *
+    FROM products
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?;
+  `;
+
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [limit, offset]);
+
+  // Transform the products with filtered variants into ProductsCartType structure
+  const productWithFilteredVariants = rows.map((product) => {
+    // filter the variants base on the filters
+    // Transform the filtered variants into the variants structure
+    // Extract variant images for the prdouct
+  });
+
+  // ถ้าจะทำ pagination จริง ต้องมี COUNT แยก (ดูด้านล่าง)
+  const totalCount = rows.length;
+  const totalPages = Math.ceil(totalCount / limit);
+
+  return {
+    products: rows as ProductModelInput[],
+    totalPages,
+    currentPage,
+    totalCount,
+  };
 };

@@ -86,8 +86,6 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
     ]
   );
 
-
-
   // console.log('Product size',sizes)
 
   // state for product specs
@@ -135,7 +133,10 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
       sku: data?.product_varian[0]?.sku || "",
       product_specs: data?.product_specs,
       variant_specs: data?.product_varian[0].variant_specs,
-      questions: data?.questions,
+      questions: data?.questions?.map((q) => ({
+        question: q.question,
+        answer: q.answer,
+      })),
       variantImage: data?.product_varian[0]?.variant_image
         ? [{ url: data.product_varian[0].variant_image }]
         : [],
@@ -194,9 +195,42 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
   const isLoading = form.formState.isSubmitting;
 
   useEffect(() => {
-    if (data) {
-      form.reset(data);
-    }
+    if (!data) return;
+
+    form.reset({
+      name: data.name ?? "",
+      description: data.description ?? "",
+      variantName: data.product_varian?.[0]?.name ?? "",
+      variantDescription: data.product_varian?.[0]?.description ?? "",
+      images: data.product_varian?.[0]?.images ?? [],
+      variantImage: data.product_varian?.[0]?.variant_image
+        ? [{ url: data.product_varian[0].variant_image }]
+        : [],
+      categoryId: data.categories?.id ?? "",
+      subCategoryId: data.sub_categories?.id ?? "",
+      brand: data.brand ?? "",
+      sku: data.product_varian?.[0]?.sku ?? "",
+      keywords: data.product_varian?.[0]?.keywords ?? [],
+      colors: data.product_varian?.[0]?.colors?.map((c) => ({
+        color: c.name ?? "",
+      })) ?? [{ color: "" }],
+      sizes: data.product_varian?.[0]?.sizes?.map((s) => ({
+        size: s.size ?? "",
+        quantity: s.quantity ?? 0,
+        price: s.price ?? 0,
+        discount: s.discount ?? 0,
+      })) ?? [{ size: "", quantity: 0, price: 0, discount: 0 }],
+      product_specs: data.product_specs ?? [{ name: "", value: "" }],
+      variant_specs: data.product_varian?.[0]?.variant_specs ?? [
+        { name: "", value: "" },
+      ],
+      questions: data.questions?.map((q) => ({
+        question: q.question ?? "",
+        answer: q.answer ?? "",
+      })) ?? [{ question: "", answer: "" }],
+      isSale: data.product_varian?.[0]?.is_sale ?? false,
+      saleEndDate: data.product_varian?.[0]?.sale_end_date ?? "",
+    });
   }, [data, form]);
 
   // Whenever colors, sizes, keywords changes we update the form values
@@ -206,7 +240,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
     form.setValue("keywords", keywords);
     form.setValue("product_specs", productSpecs);
     form.setValue("variant_specs", variantSpecs);
-  }, [colors, form, sizes, keywords, productSpecs, variantSpecs]);
+    form.setValue("questions", questions);
+  }, [colors, form, sizes, keywords, productSpecs, variantSpecs, questions]);
 
   // console.log("form sizes ---->", form.watch().sizes);
 
@@ -241,6 +276,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
     //   },
     // });
 
+    console.log("click");
+
     try {
       const response = await upsertProduct(
         {
@@ -258,7 +295,10 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
             name: spec.name ?? "",
             value: spec.value ?? "",
           })),
-          questions: values.questions,
+          questions: values.questions?.map((q) => ({
+            question: q.question,
+            answer: q.answer,
+          })),
           product_varian: [
             {
               id: data?.product_varian[0]!.id,
@@ -765,12 +805,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                   details={questions}
                   setDetails={setQuestions}
                   header="Questions & Answers"
-                  initialDetail={{
-                    size: "",
-                    price: 0,
-                    quantity: 0,
-                    discount: 0,
-                  }}
+                  initialDetail={{ question: "", answer: "" }}
                 />
                 {errors.questions && (
                   <span className="text-sm font-medium text-destructive">

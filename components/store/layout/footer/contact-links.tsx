@@ -26,6 +26,48 @@ const ContactLink = () => {
           size={28}
           fill="#7f7f7f"
         />
+        <SocialLogo
+          icon="whatsapp"
+          className="cursor-pointer hover:fill-slate-600"
+          size={28}
+          fill="#7f7f7f"
+        />
+        <SocialLogo
+          icon="pinterest"
+          className="cursor-pointer hover:fill-slate-600"
+          size={28}
+          fill="#7f7f7f"
+        />
+        <SocialLogo
+          icon="linkedin"
+          className="cursor-pointer hover:fill-slate-600"
+          size={28}
+          fill="#7f7f7f"
+        />
+        <SocialLogo
+          icon="instagram"
+          className="cursor-pointer hover:fill-slate-600"
+          size={28}
+          fill="#7f7f7f"
+        />
+        <SocialLogo
+          icon="youtube"
+          className="cursor-pointer hover:fill-slate-600"
+          size={28}
+          fill="#7f7f7f"
+        />
+        <SocialLogo
+          icon="telegram"
+          className="cursor-pointer hover:fill-slate-600"
+          size={28}
+          fill="#7f7f7f"
+        />
+        <SocialLogo
+          icon="x"
+          className="cursor-pointer hover:fill-slate-600"
+          size={28}
+          fill="#7f7f7f"
+        />
       </div>
     </div>
   );

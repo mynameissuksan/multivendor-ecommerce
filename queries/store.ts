@@ -14,13 +14,15 @@ import { CountryWithShippingRateModel } from "@/models/shipping-model";
 export const getAllStoreByUserId = async (userId: string) => {
   const [rows] = await pool.query<StoreModel[]>(
     "SELECT * FROM stores WHERE user_id = ?",
-    [userId]
+    [userId],
   );
 
   return rows;
 };
 
 export const upsertStore = async (store: StoreModelInput) => {
+  const conn = await pool.getConnection();
+  await conn.beginTransaction();
   try {
     const user = await currentUser();
     if (!user) throw new Error("Unauthorized!");
@@ -30,7 +32,7 @@ export const upsertStore = async (store: StoreModelInput) => {
     if (!store) throw new Error("Please provide store data.");
 
     // ตรวจสอบข้อมูลซ้ำ ยกเว้น record ตัวเองตอน update
-    const [rows] = await pool.query<StoreModel[]>(
+    const [rows] = await conn.query<StoreModel[]>(
       `
       SELECT id, name, email, phone, url
       FROM stores
@@ -45,7 +47,7 @@ export const upsertStore = async (store: StoreModelInput) => {
         store.url,
         store.id ?? null,
         store.id ?? null,
-      ]
+      ],
     );
 
     if (rows.length > 0) {
@@ -63,7 +65,7 @@ export const upsertStore = async (store: StoreModelInput) => {
 
     // Update
     if (store.id) {
-      await pool.query<StoreResultModel>(
+      await conn.query<StoreResultModel>(
         `
         UPDATE stores
         SET
@@ -100,14 +102,14 @@ export const upsertStore = async (store: StoreModelInput) => {
           store.default_delivery_time_min,
           store.default_delivery_time_max,
           store.id,
-        ]
+        ],
       );
 
       return { message: "Store updated successfully", status: true };
     }
 
     // Insert
-    const [result] = await pool.query<StoreResultModel>(
+    const [result] = await conn.query<StoreResultModel>(
       `
       INSERT INTO stores (
         user_id,
@@ -144,23 +146,27 @@ export const upsertStore = async (store: StoreModelInput) => {
         store.default_shipping_fees,
         store.default_delivery_time_min,
         store.default_delivery_time_max,
-      ]
+      ],
     );
-
+    await conn.commit();
     return {
       message: "Store created successfully",
       storeId: result.insertId,
     };
   } catch (error) {
+    await conn.rollback();
     throw error;
+  } finally {
+    conn.release();
   }
 };
 
 export const getStoreByUrl = async (url: string) => {
   const [storeDetails] = await pool.query<StoreModel[]>(
     "SELECT * FROM stores WHERE url = ? LIMIT 1",
-    [url]
+    [url],
   );
+
   return storeDetails[0];
 };
 
@@ -184,7 +190,7 @@ export const getStoreDefaultShippingDetails = async (storeUrl: string) => {
       default_shipping_fee_fixed,
       return_policy
       FROM stores WHERE url = ? LIMIT 1`,
-      [storeUrl]
+      [storeUrl],
     );
 
     if (store.length === 0) throw new Error("Store not found");
@@ -197,10 +203,11 @@ export const getStoreDefaultShippingDetails = async (storeUrl: string) => {
 
 export const updateStoreDefaultShippingDetails = async (
   storeUrl: string,
-  details: StoreModelInput
+  details: StoreModelInput,
 ) => {
   console.log("details ", details);
-
+  const conn = await pool.getConnection();
+  await conn.beginTransaction();
   try {
     const user = await currentUser();
     if (!user) throw new Error("Unauthorized.");
@@ -211,18 +218,18 @@ export const updateStoreDefaultShippingDetails = async (
     if (!storeUrl) throw new Error("No shipping details provide to update.");
 
     // Make sure seller is updating their own store
-    const [check_ownership] = await pool.query<RowDataPacket[]>(
+    const [check_ownership] = await conn.query<RowDataPacket[]>(
       "SELECT id FROM stores WHERE url = ? AND user_id = ?",
-      [storeUrl, user.id]
+      [storeUrl, user.id],
     );
 
     if (check_ownership.length === 0)
       throw new Error(
-        "Make sure you have the permissions to update this store"
+        "Make sure you have the permissions to update this store",
       );
 
     // find and update the store based on storeUrl
-    await pool.query<ResultSetHeader>(
+    await conn.query<ResultSetHeader>(
       `UPDATE stores SET 
      default_shipping_service = ?, 
      default_shipping_fee_per_item = ?,
@@ -246,13 +253,17 @@ export const updateStoreDefaultShippingDetails = async (
         details.return_policy,
         storeUrl,
         user.id,
-      ]
+      ],
     );
+    await conn.commit();
     return {
       ok: true,
     };
   } catch (error) {
+    await conn.rollback();
     throw error;
+  } finally {
+    conn.release();
   }
 };
 
@@ -265,31 +276,31 @@ export const getStoreShippingRates = async (storeUrl: string) => {
     // Make sure seller is updating their own store
     const [check_ownership] = await pool.query<RowDataPacket[]>(
       "SELECT id FROM stores WHERE url = ? AND user_id = ? LIMIT 1",
-      [storeUrl, userId]
+      [storeUrl, userId],
     );
 
     if (check_ownership.length === 0)
       throw new Error(
-        "Make sure you have the permissions to udpate this store."
+        "Make sure you have the permissions to udpate this store.",
       );
 
     // Get store details
     const [store] = await pool.query<RowDataPacket[]>(
       "SELECT * FROM stores WHERE url = ? AND user_id = ? LIMIT 1",
-      [storeUrl, userId]
+      [storeUrl, userId],
     );
 
     if (store.length === 0) throw new Error("Store could not be found.");
 
     // Retrieve all countries
     const [countries] = await pool.query<RowDataPacket[]>(
-      "SELECT id,name FROM countries ORDER BY name DESC"
+      "SELECT id,name FROM countries ORDER BY name DESC",
     );
 
     // Retrieve all shipping rates for specified store
     const [shippingRates] = await pool.query<RowDataPacket[]>(
       "SELECT * FROM shipping_rates WHERE store_id = ?",
-      [store[0].id]
+      [store[0].id],
     );
 
     // create a map for quick lookup for shipping rates by country id
@@ -304,6 +315,7 @@ export const getStoreShippingRates = async (storeUrl: string) => {
       countryName: country.name,
       shippingRate: rateMap.get(country.id) || null,
     }));
+
     return result;
   } catch (error) {
     throw error;
@@ -313,19 +325,22 @@ export const getStoreShippingRates = async (storeUrl: string) => {
 //
 export const upsertShippngRate = async (
   storeUrl: string,
-  shippingRate: CountryWithShippingRateModel
+  shippingRate: CountryWithShippingRateModel,
 ) => {
+  const conn = await pool.getConnection();
   try {
+    await conn.beginTransaction();
+
     const userId = await permissionSeller(storeUrl);
 
-    const [check_ownership] = await pool.query<RowDataPacket[]>(
+    const [check_ownership] = await conn.query<RowDataPacket[]>(
       "SELECT id FROM stores WHERE url = ? AND user_id = ?",
-      [storeUrl, userId]
+      [storeUrl, userId],
     );
 
     if (check_ownership.length === 0)
       throw new Error(
-        "Make sure you have the permissions to update this store"
+        "Make sure you have the permissions to update this store",
       );
 
     if (!shippingRate) throw new Error("Please provide shipping rate data.");
@@ -334,9 +349,9 @@ export const upsertShippngRate = async (
       throw new Error("Please provide a valid country ID.");
 
     // get store id
-    const [store] = await pool.query<RowDataPacket[]>(
+    const [store] = await conn.query<RowDataPacket[]>(
       "SELECT id FROM stores WHERE url = ? AND user_id = ? LIMIT 1",
-      [storeUrl, userId]
+      [storeUrl, userId],
     );
 
     if (store.length === 0)
@@ -374,24 +389,24 @@ export const upsertShippngRate = async (
     const placeholder = columns.map(() => "?").join(", ");
     const placeholderUpdate = columns.map((v) => `${v} = ?`).join(", ");
 
-    const [existing] = await pool.query<RowDataPacket[]>(
+    const [existing] = await conn.query<RowDataPacket[]>(
       "SELECT id FROM shipping_rates WHERE country_id = ? LIMIT 1",
-      [shipping.country_id]
+      [shipping.country_id],
     );
 
     if (existing.length === 0) {
       // insert
       const sql = `INSERT INTO shipping_rates (${columns.join(
-        ", "
+        ", ",
       )}) VALUES (${placeholder})`;
 
-      await pool.query<ResultSetHeader>(sql, values);
+      await conn.query<ResultSetHeader>(sql, values);
     } else {
       // update
       const sql = `UPDATE shipping_rates SET ${placeholderUpdate}, updated_at = NOW() WHERE country_id = '${shipping.country_id}'`;
-      await pool.query<ResultSetHeader>(sql, values);
+      await conn.query<ResultSetHeader>(sql, values);
     }
-
+    await conn.commit();
     return {
       message:
         existing.length === 0
@@ -399,6 +414,9 @@ export const upsertShippngRate = async (
           : "Store default shipping details has been updated.",
     };
   } catch (error) {
+    await conn.rollback();
     throw error;
+  } finally {
+    conn.release();
   }
 };

@@ -135,19 +135,11 @@ export const ProductFormSchema = z.object({
   isSale: z.boolean().default(false).optional(),
   saleEndDate: z.string().optional(),
   questions: z
-    .object({
-      question: z.string(),
-      answer: z.string(),
-    })
-    .array()
-    .min(1, {
-      message: "Please provide at least one question.",
-    })
-    .refine(
-      (question) =>
-        question.every((q) => q.question.length > 0 && q.answer.length > 0),
-      {
-        message: "All product question inputs must be filled correctly.",
-      }
-    ),
+    .array(
+      z.object({
+        question: z.string().optional(),
+        answer: z.string().optional(),
+      })
+    )
+    .optional(),
 });

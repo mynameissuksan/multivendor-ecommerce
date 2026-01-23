@@ -12,13 +12,14 @@ export const pool =
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: Number(process.env.DB_PORT) || 3306,
+
     waitForConnections: true,
-    connectionLimit: 50, // 👈 อันนี้สำคัญสุด ช่วยเรื่อง Pool เต็ม
+    connectionLimit: 20,
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
-    connectTimeout: 20000, // 👈 เพิ่มเวลา connect เป็น 20 วิ
+    connectTimeout: 20000,
+    charset: "utf8mb4",
   });
-if (process.env.NODE_ENV !== "production") {
-  global.mysqlPool = pool;
-}
+
+if (process.env.NODE_ENV !== "production") global.mysqlPool = pool;

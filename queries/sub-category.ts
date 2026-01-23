@@ -8,9 +8,13 @@ import {
 import { pool } from "@/lib/config/db";
 import { SubCategoryInput } from "@/models/sub-category-model";
 import { currentUser } from "@clerk/nextjs/server";
+import { RowDataPacket } from "mysql2";
 
 export const upsertSubCategory = async (subCategory: SubCategoryInput) => {
+  const conn = await pool.getConnection();
   try {
+    await conn.beginTransaction();
+
     const user = await currentUser();
     if (!user) throw new Error("Unauthorized");
 
@@ -19,9 +23,9 @@ export const upsertSubCategory = async (subCategory: SubCategoryInput) => {
       throw new Error("Unauthorized Access");
 
     // Ensure category data is provided
-    const [existingSubCategory] = await pool.query<SubCategoryModel[]>(
+    const [existingSubCategory] = await conn.query<SubCategoryModel[]>(
       "SELECT id FROM sub_categories WHERE name = ? AND url = ? AND id != ? LIMIT 1",
-      [subCategory.name, subCategory.url, subCategory.id || 0]
+      [subCategory.name, subCategory.url, subCategory.id || 0],
     );
 
     if (
@@ -30,13 +34,13 @@ export const upsertSubCategory = async (subCategory: SubCategoryInput) => {
       existingSubCategory[0].url === subCategory.url
     ) {
       throw new Error(
-        "Sub Category with the same name and URL already exists."
+        "Sub Category with the same name and URL already exists.",
       );
     }
 
     if (subCategory.id) {
       // update existing category
-      const [result] = await pool.query<SubCategoryResultModel>(
+      const [result] = await conn.query<SubCategoryResultModel>(
         "UPDATE sub_categories SET name = ?, image = ?, url = ?, featured = ?, updated_at = NOW() WHERE id = ?",
         [
           subCategory.name,
@@ -44,12 +48,12 @@ export const upsertSubCategory = async (subCategory: SubCategoryInput) => {
           subCategory.url,
           subCategory.featured,
           subCategory.id,
-        ]
+        ],
       );
       return { ...result };
     } else {
       // insert new category
-      const [result] = await pool.query<SubCategoryResultModel>(
+      const [result] = await conn.query<SubCategoryResultModel>(
         "INSERT INTO sub_categories (name, image,url, featured, category_id) VALUES (?,?,?,?,?)",
         [
           subCategory.name,
@@ -57,16 +61,19 @@ export const upsertSubCategory = async (subCategory: SubCategoryInput) => {
           subCategory.url,
           subCategory.featured,
           subCategory.categoryId,
-        ]
+        ],
       );
-
+      await conn.commit();
       return { ...result };
     }
   } catch (error) {
+    await conn.rollback();
     console.error("error ", error);
     throw new Error(
-      error instanceof Error ? error.message : "An error occurred"
+      error instanceof Error ? error.message : "An error occurred",
     );
+  } finally {
+    conn.release();
   }
 };
 
@@ -90,7 +97,7 @@ export const getAllSubCategories = async () => {
       INNER JOIN categories
         ON categories.id = sub_categories.category_id
       ORDER BY sub_categories.updated_at DESC;
-`
+`,
   );
   const result = subCategories.map((row) => ({
     id: row.subId,
@@ -107,6 +114,7 @@ export const getAllSubCategories = async () => {
       featured: !!row.catfe,
     },
   }));
+
   return result;
 };
 
@@ -114,7 +122,7 @@ export const getSubCategory = async (subCategoryId: string) => {
   if (!subCategoryId) throw new Error("Please provide sub category ID");
   const [subCategory] = await pool.query<SubCategoryModel[]>(
     "SELECT * FROM sub_categories WHERE id = ?",
-    [subCategoryId]
+    [subCategoryId],
   );
 
   return subCategory[0];
@@ -131,8 +139,9 @@ export const deleteSubCategory = async (subCategoryId: string) => {
 
   const [result] = await pool.query<SubCategoryResultModel>(
     "DELETE FROM sub_categories WHERE id = ?",
-    [subCategoryId]
+    [subCategoryId],
   );
+
   return { ...result };
 };
 
@@ -141,15 +150,49 @@ export const deleteSubCategory = async (subCategoryId: string) => {
 export const getAllSubCategoriesForCategory = async (categoryId: string) => {
   const [subCategories] = await pool.query<SubCategoryModel[]>(
     "SELECT * FROM sub_categories WHERE category_id = ? ORDER BY updated_at DESC",
-    [categoryId]
+    [categoryId],
   );
+
   return subCategories;
 };
 
 export const getSubCategoryById = async (subCategoryId: string) => {
   const [subCategories] = await pool.query<SubCategoryModel[]>(
     "SELECT * FROM sub_categories WHERE id = ? ORDER BY updated_at DESC",
-    [subCategoryId]
+    [subCategoryId],
   );
+
   return subCategories;
+};
+
+export const getSubcategories = async (
+  limit: number,
+  random: boolean = false,
+): Promise<SubCategoryInput[]> => {
+  let sql = `SELECT * FROM sub_categories`;
+  try {
+    // define the query options
+    if (random) {
+      sql += ` ORDER BY RAND() `;
+    } else {
+      sql += ` ORDER BY updated_at DESC `;
+    }
+
+    sql += ` LIMIT ? `;
+
+    const [rows] = await pool.query<RowDataPacket[]>(sql, [limit]);
+    const mapData: SubCategoryInput[] = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      image: row.image,
+      url: row.url,
+      featured: row.fetured,
+      categoryId: row.categoryid,
+    }));
+
+    return mapData;
+  } catch (error) {
+    console.log("Error fetching subcategories", error);
+    throw error;
+  }
 };

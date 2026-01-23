@@ -23,7 +23,7 @@ export const getAllOfferTags = async () => {
     FROM offer_tags 
     LEFT JOIN products ON offer_tags.id = products.offer_tag_id
     ORDER BY offer_tags.created_at DESC, products.created_at DESC
-    `
+    `,
   );
 
   const dataMap = new Map<string, OfferTagModel>();
@@ -50,5 +50,6 @@ export const getAllOfferTags = async () => {
       });
     }
   }
+
   return Array.from(dataMap.values());
 };

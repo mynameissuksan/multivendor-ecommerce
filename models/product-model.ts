@@ -15,6 +15,7 @@ export interface ProductModelInput {
   slug?: string;
   brand: string;
   rating?: number;
+  sales?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -33,6 +34,7 @@ export interface ProductVariantModelInput {
   is_sale?: boolean;
   sale_end_date?: string;
   sku?: string;
+  sales?: number;
   created_at?: string;
   updated_at?: string;
 }

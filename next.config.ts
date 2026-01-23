@@ -1,7 +1,18 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   /* config options here */
+
+  experimental: {
+    allowedDevOrigins: [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://172.20.10.9:3000",
+      // ถ้าคุณเปิดผ่านโดเมนใน LAN ก็ใส่เพิ่ม:
+      // "http://your-domain-or-ip:3000",
+    ],
+  },
+
   images: {
     remotePatterns: [
       {
@@ -14,6 +25,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-};
+} as NextConfig;
 
 export default nextConfig;

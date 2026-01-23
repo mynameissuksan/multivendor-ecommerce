@@ -115,7 +115,7 @@ export default function DataTable<TData, TValue>({
       </div>
 
       {/* Table */}
-      <div className=" border bg-background rounded-lg">
+      <div className="border bg-background rounded-lg">
         <Table className="">
           {/* Table header */}
           {!noHeader && (

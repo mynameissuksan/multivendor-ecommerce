@@ -10,6 +10,8 @@ import { currentUser } from "@clerk/nextjs/server";
 import { RowDataPacket } from "mysql2";
 
 export const upsertCategory = async (category: CategoryInput) => {
+  const conn = await pool.getConnection();
+  await conn.beginTransaction();
   try {
     const user = await currentUser();
     if (!user) throw new Error("Unauthorized");
@@ -19,9 +21,9 @@ export const upsertCategory = async (category: CategoryInput) => {
       throw new Error("Unauthorized Access");
 
     // Ensure category data is provided
-    const [existingCategory] = await pool.query<CategoryModel[]>(
+    const [existingCategory] = await conn.query<CategoryModel[]>(
       "SELECT id FROM categories WHERE name = ? AND url = ? AND id != ? LIMIT 1",
-      [category.name, category.url, category.id || 0]
+      [category.name, category.url, category.id || 0],
     );
 
     if (
@@ -34,7 +36,7 @@ export const upsertCategory = async (category: CategoryInput) => {
 
     if (category.id) {
       // update existing category
-      const [result] = await pool.query<CategoryResultModel>(
+      const [result] = await conn.query<CategoryResultModel>(
         "UPDATE categories SET name = ?, image = ?, url = ?, featured = ?, updated_at = NOW() WHERE id = ?",
         [
           category.name,
@@ -42,30 +44,35 @@ export const upsertCategory = async (category: CategoryInput) => {
           category.url,
           category.featured,
           category.id,
-        ]
+        ],
       );
+      await conn.commit();
       return { ...result };
     } else {
       // insert new category
-      const [result] = await pool.query<CategoryResultModel>(
+      const [result] = await conn.query<CategoryResultModel>(
         "INSERT INTO categories (name, image,url, featured) VALUES (?,?,?,?)",
-        [category.name, category.image, category.url, category.featured]
+        [category.name, category.image, category.url, category.featured],
       );
-
+      await conn.commit();
       return { ...result };
     }
   } catch (error) {
     console.error("error ", error);
+    await conn.rollback();
     throw new Error(
-      error instanceof Error ? error.message : "An error occurred"
+      error instanceof Error ? error.message : "An error occurred",
     );
+  } finally {
+    conn.release();
   }
 };
 
 export const getAllCategories = async () => {
   const [categories] = await pool.query<(CategoryModel & RowDataPacket)[]>(
-    "SELECT * FROM categories ORDER BY updated_at DESC"
+    "SELECT * FROM categories ORDER BY updated_at DESC",
   );
+
   return categories;
 };
 
@@ -73,7 +80,7 @@ export const getCategory = async (categoryId: string) => {
   if (!categoryId) throw new Error("Please provide category ID");
   const [category] = await pool.query<(CategoryModel & RowDataPacket)[]>(
     "SELECT * FROM categories WHERE id = ?",
-    [categoryId]
+    [categoryId],
   );
 
   return category[0];
@@ -90,7 +97,8 @@ export const deleteCategory = async (categoryId: string) => {
 
   const [result] = await pool.query<CategoryResultModel>(
     "DELETE FROM categories WHERE id = ?",
-    [categoryId]
+    [categoryId],
   );
+
   return { ...result };
 };

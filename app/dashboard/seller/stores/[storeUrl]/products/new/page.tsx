@@ -8,6 +8,8 @@ const SellerNewProductPage = async ({
 }) => {
   const categories = await getAllCategories();
   const { storeUrl } = await params;
+
+  console.log("storeUrl", storeUrl);
   return (
     <div className="w-full">
       <ProductDetails categories={categories} storeUrl={storeUrl} />
