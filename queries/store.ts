@@ -420,3 +420,10 @@ export const upsertShippngRate = async (
     conn.release();
   }
 };
+
+// export const getStoreById = async (storeId: string) => {
+//   const [rows] = await pool.query(
+//     "SELECT * FROM stores WHERE store_id = ?",
+//     [],
+//   );
+// };

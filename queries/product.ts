@@ -1,13 +1,61 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
+
+import {
+  ProductColorsModelInput,
+  ProductSpecsModel,
+  ProductVariantImagesModelInput,
+  QuestionsModel,
+} from "@/models/product-model";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { pool } from "@/lib/config/db";
 import { generateUniqueSlug } from "@/lib/server-utils";
-import { ProductModelInput } from "@/models/product-model";
+import {
+  ProductModelInput,
+  ProductSizeModelInput,
+} from "@/models/product-model";
 import { StoreModel } from "@/models/store-model";
 import { currentUser } from "@clerk/nextjs/server";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import slugify from "slugify";
+
+const productSqlColumn = ` 
+       -- Product Info
+       p.id AS product_id,
+       p.name AS product_name,
+       p.description AS product_description,
+       p.slug AS product_slug,
+       p.brand AS product_brand,
+       p.rating AS product_rating,
+       p.sales as product_sales,
+   
+       
+       -- Category Info
+       c.id AS category_id,
+       c.name AS category_name,
+       c.url AS category_url,
+       c.image AS category_image,
+      
+       -- Sub Category Info
+       sc.id AS sub_category_id,
+       sc.name AS sub_category_name,
+       sc.url AS sub_category_url,
+       sc.image AS sub_category_image,
+       
+       -- Variant Info
+       pv.id AS variant_id,
+       pv.name AS variant_name,
+       pv.description AS variant_description,
+       pv.slug AS variant_slug,
+       pv.keywords AS variant_keywords,
+       pv.is_sale AS variant_is_sale,
+       pv.sku AS variant_sku,
+       pv.sales AS variant_sales,
+       
+       -- Store Info
+       s.id AS store_id,
+       s.name AS store_name,
+       s.url AS store_url `;
 
 export const upsertProduct = async (
   product: ProductModelInput,
@@ -168,7 +216,7 @@ export const upsertProduct = async (
     // ----------------- Upsert Specs --------------------
 
     await conn.query(
-      "DELETE FROM spces WHERE product_id = ? AND variant_id = ?",
+      "DELETE FROM specs WHERE product_id = ? AND variant_id = ?",
       [productId, variantId],
     );
 
@@ -184,7 +232,7 @@ export const upsertProduct = async (
         variantId,
       ]);
       await conn.query(
-        `INSERT INTO spces (name, value, product_id, variant_id)
+        `INSERT INTO specs (name, value, product_id, variant_id)
          VALUES ${values}`,
         params,
       );
@@ -365,44 +413,9 @@ async function getStoreIdByUrl(storeUrl: string): Promise<string> {
 
 // Query products พร้อมข้อมูล related tables
 async function queryProducts(storeId: string) {
-  const conn = await pool.getConnection();
-  await conn.beginTransaction();
   try {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT 
-       -- Product Info
-       p.id AS product_id,
-       p.name AS product_name,
-       p.description AS product_description,
-       p.slug AS product_slug,
-       p.brand AS product_brand,
-       p.rating AS product_rating,
-       
-       -- Category Info
-       c.id AS category_id,
-       c.name AS category_name,
-       c.url AS category_url,
-       c.image AS category_image,
-      
-       -- Sub Category Info
-       sc.id AS sub_category_id,
-       sc.name AS sub_category_name,
-       sc.url AS sub_category_url,
-       sc.image AS sub_category_image,
-       
-       -- Variant Info
-       pv.id AS variant_id,
-       pv.name AS variant_name,
-       pv.description AS variant_description,
-       pv.slug AS variant_slug,
-       pv.keywords AS variant_keywords,
-       pv.is_sale AS variant_is_sale,
-       pv.sku AS variant_sku,
-       
-       -- Store Info
-       s.id AS store_id,
-       s.name AS store_name,
-       s.url AS store_url
+    const sql = `SELECT 
+      ${productSqlColumn}
 
      FROM products p
      INNER JOIN categories c ON p.category_id = c.id
@@ -410,21 +423,17 @@ async function queryProducts(storeId: string) {
      INNER JOIN products_variant pv ON p.id = pv.product_id
      INNER JOIN stores s ON p.store_id = s.id
      WHERE s.id = ?
-     ORDER BY p.id, pv.id`,
-      [storeId],
-    );
-    await conn.commit();
+     ORDER BY p.id, pv.id`;
+
+    const [rows] = await pool.query<RowDataPacket[]>(sql, [storeId]);
+
     return rows;
   } catch (error) {
-    await conn.rollback();
     throw error;
-  } finally {
-    conn.release();
   }
 }
 
 // Query variant images สำหรับ variants ทั้งหมด
-
 async function queryVariantImages(variantIds: string[]) {
   if (variantIds.length === 0) return [];
 
@@ -467,6 +476,23 @@ async function queryVariantSizes(variantIds: string[]) {
   return rows;
 }
 
+async function queryVariantSpecs(variantIds: string[]) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT id, name, value FROM specs WHERE variant_id IN (?)`,
+    [variantIds],
+  );
+  return rows;
+}
+
+// query questions
+
+async function queryQuestions(productId: string[]) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT id, question, answer FROM questions WHERE product_id IN (?)`,
+    [productId],
+  );
+  return rows;
+}
 // แปลง raw data เป็น ProductModelInput
 function mapProductsData(
   productRows: RowDataPacket[],
@@ -487,11 +513,13 @@ function mapProductsData(
         slug: row.product_slug,
         brand: row.product_brand,
         rating: row.product_rating,
+        sales: row.product_sales,
 
         stores: {
           id: row.store_id,
           name: row.store_name,
           url: row.store_url,
+          logo: row.store_logo,
         },
 
         categories: {
@@ -529,6 +557,8 @@ function mapProductsData(
         keywords: row.variant_keywords?.split(",").filter(Boolean) || [],
         is_sale: Boolean(row.variant_is_sale),
         sku: row.variant_sku,
+        sales: row.variant_sales,
+        sale_end_date: row.sale_end_date,
 
         images: images
           .filter((img) => img.products_variant_id === row.variant_id)
@@ -570,7 +600,7 @@ function mapProductsData(
 
 //  Main
 
-//  ดึงข้อมูล products ทั้งหมดของ store พร้อม variants, images, colors, sizes
+//  ดึงข้อมูล products ทั้งหมดของ store พร้อม variants, images, colors, sizes แสดงข้อมูลเก่าพร้อมอัพเดทสินค้า
 export async function getAllStoreProducts(
   storeUrl: string,
 ): Promise<ProductModelInput[]> {
@@ -649,29 +679,193 @@ export const getProducts = async (
   const offset = (currentPage - 1) * limit;
 
   const sql = `
-    SELECT *
-    FROM products
-    ORDER BY created_at DESC
-    LIMIT ? OFFSET ?;
+    SELECT 
+       ${productSqlColumn}
+
+     FROM products p
+     INNER JOIN categories c ON p.category_id = c.id
+     INNER JOIN sub_categories sc ON p.sub_category_id = sc.id
+     INNER JOIN products_variant pv ON p.id = pv.product_id
+     INNER JOIN stores s ON p.store_id = s.id
+     ORDER BY p.id DESC
+     LIMIT ? OFFSET ?
   `;
 
   const [rows] = await pool.query<RowDataPacket[]>(sql, [limit, offset]);
 
   // Transform the products with filtered variants into ProductsCartType structure
-  const productWithFilteredVariants = rows.map((product) => {
-    // filter the variants base on the filters
-    // Transform the filtered variants into the variants structure
-    // Extract variant images for the prdouct
-  });
+  // const productWithFilteredVariants = rows.map((product) => {
+  //   // filter the variants base on the filters
+  //   // Transform the filtered variants into the variants structure
+  //   // Extract variant images for the prdouct
+  // });
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  // 3. เก็บ variant IDs ทั้งหมด
+  const variantIds = [...new Set(rows.map((row) => row.variant_id))];
+  // const variantIds = productRows.map((row) => row.variant_id);
+
+  // console.log("variantIds", variantIds);
+
+  // 4. Query related data แบบ parallel
+  const [images, colors, sizes] = await Promise.all([
+    queryVariantImages(variantIds),
+    queryVariantColors(variantIds),
+    queryVariantSizes(variantIds),
+  ]);
+
+  // 5. Map ข้อมูลเป็น ProductModelInput
+  const products = mapProductsData(rows, images, colors, sizes);
 
   // ถ้าจะทำ pagination จริง ต้องมี COUNT แยก (ดูด้านล่าง)
   const totalCount = rows.length;
   const totalPages = Math.ceil(totalCount / limit);
 
   return {
-    products: rows as ProductModelInput[],
+    products: products,
     totalPages,
     currentPage,
     totalCount,
+  };
+};
+
+export const getProductBySlug = async (slug: string) => {
+  try {
+    //   Fetch the prodcut from the db using the provided slug
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `
+      SELECT 
+      -- product info
+      p.id as pd_id,
+      p.slug as pd_slug,
+
+
+      -- variant info
+      pv.id as pv_id,
+      pv.slug as pv_slug
+
+      FROM products p
+      INNER JOIN products_variant pv ON p.id = pv.product_id
+      WHERE p.slug = ?
+      `,
+      [slug],
+    );
+
+    const mapData = new Map<string, ProductModelInput>();
+
+    for (const row of rows) {
+      if (!mapData.has(row.pd_id)) {
+        mapData.set(row.pd_id, {
+          id: row.pd_id,
+          name: "",
+          slug: row.pd_slug,
+          brand: "",
+          product_varian: [],
+        });
+      }
+
+      if (row.pd_id) {
+        mapData.get(row.pd_id)?.product_varian.push({
+          id: row.pv_id,
+          name: row.pv_name,
+          slug: row.pv_slug,
+          images: [],
+        });
+      }
+    }
+
+    const value = Array.from(mapData.values());
+    return value[0];
+  } catch (error) {
+    throw error;
+  }
+};
+
+// getProductPageData
+// Retrieves datails of a specific product variant from the db
+export const getProductPageData = async (
+  productSlug: string,
+  variantSlug: string,
+) => {
+  // Retrieve product variant details from the db
+  const product = await retrieveProductDetails(productSlug, variantSlug);
+  if (!product) return;
+
+  return product;
+};
+
+// helper funcitons
+export const retrieveProductDetails = async (
+  productSlug: string,
+  variantSlug: string,
+) => {
+  const sql = `
+     SELECT 
+    ${productSqlColumn},
+     -- addition
+     oft.id as oft_id,
+     oft.name as oft_name,
+     oft.url as oft_url,
+     pv.sale_end_date,
+     s.logo as store_logo
+     
+     FROM products p
+     LEFT JOIN offer_tags oft ON p.offer_tag_id = oft.id
+     INNER JOIN categories c ON p.category_id = c.id
+     INNER JOIN sub_categories sc ON p.sub_category_id = sc.id
+     INNER JOIN products_variant pv ON p.id = pv.product_id
+     INNER JOIN stores s ON p.store_id = s.id
+     WHERE p.slug = ? AND pv.slug = ?
+     LIMIT 1
+   `;
+
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [
+    productSlug,
+    variantSlug,
+  ]);
+
+  if (rows.length === 0) {
+    throw new Error("Product not found");
+  }
+
+  // 3. เก็บ variant IDs ทั้งหมด
+  const variantIds = [...new Set(rows.map((row) => row.variant_id))]; // กันพลาดดด
+  // const variantIds = productRows.map((row) => row.variant_id);
+
+  // console.log("variantIds", variantIds);
+
+  // 4. Query related data แบบ parallel
+  const [images, colors, sizes, specs, questions] = await Promise.all([
+    queryVariantImages(variantIds),
+    queryVariantColors(variantIds),
+    queryVariantSizes(variantIds),
+    queryVariantSpecs(variantIds),
+    queryQuestions(rows[0].product_id),
+  ]);
+
+  const products = mapProductsData(rows, images, colors, sizes);
+
+  return {
+    offerTag: {
+      offer_tag_id: rows[0].oft_id as string,
+      offer_tag_name: rows[0].oft_name as string,
+      offer_tag_url: rows[0].oft_url as string,
+    },
+    specs: specs as ProductSpecsModel[],
+    questions: questions as QuestionsModel[],
+    followersCount: 10,
+    isUserFollowingStore: true,
+    reviews: [],
+    numReviews: 1000,
+    reviewsStatistics: {
+      ratingStatistic: [],
+      reviewWithImageCount: 5,
+    },
+    shippingDetails: {},
+    relatedProducts: [],
+    product: products,
   };
 };

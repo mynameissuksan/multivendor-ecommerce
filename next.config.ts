@@ -23,6 +23,18 @@ const nextConfig = {
         protocol: "https",
         hostname: "img.clerk.com",
       },
+      {
+        protocol: "https",
+        hostname: "img.pikbest.com",
+      },
+      {
+        protocol: "https",
+        hostname: "img.freepik.com",
+      },
+        {
+        protocol: "https",
+        hostname: "d1csarkz8obe9u.cloudfront.net",
+      },
     ],
   },
 } as NextConfig;

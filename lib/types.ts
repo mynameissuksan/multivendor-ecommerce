@@ -1,4 +1,5 @@
-import COUNTRIES from '@/data/countries.json';
+import COUNTRIES from "@/data/countries.json";
+import { getProductPageData } from "@/queries/product";
 
 export interface DashboardSidebarMenuInterface {
   label: string;
@@ -6,6 +7,8 @@ export interface DashboardSidebarMenuInterface {
   link: string;
 }
 
+export type SelectMenuOption = (typeof COUNTRIES)[number];
 
-
-export type SelectMenuOption =(typeof COUNTRIES)[number];
+export type ProductPageDataType = Awaited<
+  ReturnType<typeof getProductPageData>
+>;

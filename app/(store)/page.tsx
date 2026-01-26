@@ -1,11 +1,13 @@
 import ProductList from "@/components/store/store-shared/product-list";
 import { getProducts } from "@/queries/product";
-import { UserButton } from "@clerk/nextjs";
 import React from "react";
 
 const StoreHomePage = async () => {
   const productsData = await getProducts();
-  const { products } = productsData;
+  const products = Array.isArray(productsData)
+    ? productsData
+    : productsData?.products ?? [];
+
   return (
     <div className="p-14">
       <ProductList products={products} title="Products" arrow />

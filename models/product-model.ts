@@ -67,7 +67,7 @@ export interface ProductColorsModelInput {
   updated_at?: string;
 }
 
-interface ProductSpecsModel {
+export interface ProductSpecsModel {
   id?: string;
   name: string;
   value: string;
@@ -79,7 +79,7 @@ interface VariantSpecsModel {
   value: string;
 }
 
-interface QuestionsModel {
+export interface QuestionsModel {
   id?: string;
   question: string;
   answer: string;
