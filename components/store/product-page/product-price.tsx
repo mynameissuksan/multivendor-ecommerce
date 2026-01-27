@@ -23,7 +23,6 @@ const ProductPrice: React.FC<Props> = ({ sizeId, sizes, isCard }) => {
   }
 
   //   No sizeId passed calculate rang of prices and total quantity
-
   if (!sizeId) {
     const discountedPrices = sizes.map(
       (size) => size.price * (1 - size.discount / 100),
@@ -59,6 +58,7 @@ const ProductPrice: React.FC<Props> = ({ sizeId, sizes, isCard }) => {
       }
     }
 
+    //    return the price display
     return (
       <div>
         <div className="text-orange-400 inline-block font-bold leading-none mr-2.5">
@@ -72,7 +72,7 @@ const ProductPrice: React.FC<Props> = ({ sizeId, sizes, isCard }) => {
         </div>
         {!sizeId && !isCard && (
           <div className="text-orange-400 text-xs leading-4 mt-1">
-            <span>Note: Seelct a size to see the exact price</span>
+            <span>Note: Select a size to see the exact price</span>
           </div>
         )}
         {!sizeId && !isCard && (
@@ -82,7 +82,39 @@ const ProductPrice: React.FC<Props> = ({ sizeId, sizes, isCard }) => {
     );
   }
 
-  return <div>{sizeId}</div>;
+  //   sizeId passed, find the specific size and return its details
+  const selectedSize = sizes.find((size) => size.id === sizeId);
+  if (!selectedSize) {
+    return <div></div>;
+  }
+
+  //   cacalute the price after discount
+  const discountedPrice =
+    selectedSize.price * (1 - selectedSize.discount / 100);
+
+  return (
+    <div>
+      <div className="text-orange-400 inline-block font-bold leading-none mr-2.5">
+        {/* discounted price */}
+        <span className="inline-block text-4xl">
+          ฿{discountedPrice.toFixed(2)}
+        </span>
+      </div>
+      {/* original price */}
+      {selectedSize.price !== discountedPrice && selectedSize.discount > 0 && (
+        <span className="text-[#999] inline-block text-xl font-normal leading-6 mr-2 line-through">
+          ฿{selectedSize.price}
+        </span>
+      )}
+      {/* percentage off */}
+      {selectedSize.discount > 0 && (
+        <span className="inline-block text-orange-400 text-xl leading-6">
+          {selectedSize.discount}% Off
+        </span>
+      )}
+      <p className="mt-2 text-xs">{selectedSize.quantity} pieces</p>
+    </div>
+  );
 };
 
 export default ProductPrice;

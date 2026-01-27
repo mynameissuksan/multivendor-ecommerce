@@ -17,15 +17,20 @@ export default async function ProductVariantPage({
   const { productSlug, variantSlug } = await params;
   const sizeId = (await searchParams).size;
   // fetch product data based
-  const productData = await getProductPageData(productSlug, variantSlug);
+  const productData = await getProductPageData(productSlug);
 
   // if no product data is found, show the 404 not found page
   if (!productData) {
     return notFound();
   }
 
-  // Extract the available sizes for the product variant
-  const { sizes } = productData?.product[0]?.product_varian[0];
+  // Extract the available sizes for the selected product variant
+  const product = productData?.products[0];
+  const variants = product?.product_varian ?? [];
+
+  const selectedVariant =
+    variants.find((v) => v.slug === variantSlug) ?? variants[0];
+  const sizes = selectedVariant?.sizes;
 
   //   if size is provided in the url
   if (sizeId) {
@@ -47,12 +52,16 @@ export default async function ProductVariantPage({
     products: [],
   };
 
-  const { specs, product, questions } = productData;
+  const { specs, products, questions } = productData;
 
   return (
     <div>
       <div className="max-w-412.5 mx-auto p-4 overflow-x-hidden">
-        <ProductPageContainer productData={productData} sizeId={sizeId}>
+        <ProductPageContainer
+          productData={productData}
+          sizeId={sizeId}
+          variantSlug={variantSlug}
+        >
           {relatedProducts.products && (
             <>
               <Separator />
@@ -69,7 +78,7 @@ export default async function ProductVariantPage({
             Product description
           </>
           {specs.length > 0 ||
-            (product[0].product_varian.length > 0 && (
+            (products[0].product_varian.length > 0 && (
               <>
                 <Separator className="mt-6" />
                 {/* Specs table */}

@@ -8,21 +8,36 @@ import React from "react";
 import toast from "react-hot-toast";
 import { Rating } from "react-simple-star-rating";
 import ProductPrice from "./product-price";
+import CountDown from "../store-shared/countdown";
+import { Separator } from "@/components/ui/separator";
+import ColorWheel from "@/components/shared/color-wheel";
+import ProductVariantSelector from "./variant-selector";
+import SizeSelector from "./size-selector";
+import ProductAssurancePoliy from "./product-assurance-policy";
 
 interface Props {
   productData: ProductPageDataType;
+
   quantity?: number;
   sizeId: string | undefined;
+  variantSlug: string;
 }
 
-const ProductInfo: React.FC<Props> = ({ productData, quantity, sizeId }) => {
+const ProductInfo: React.FC<Props> = ({
+  productData,
+  quantity,
+  sizeId,
+  variantSlug,
+}) => {
   if (!productData) return;
 
-  const variant = productData?.product[0]?.product_varian[0];
-  const product = productData?.product[0];
-  const colors = productData?.product[0]?.product_varian[0]?.colors![0].name;
-  const sizes = productData?.product[0]?.product_varian[0]?.sizes;
-  const stores = product.stores;
+  const product = productData?.products[0];
+  const variants = product?.product_varian ?? [];
+  const selectedSlug = variantSlug ?? variants[0]?.slug;
+  const variant = variants.find((v) => v.slug === selectedSlug) ?? variants[0];
+  const colors = variant?.colors;
+  const sizes = variant?.sizes;
+  const stores = product?.stores;
 
   const productId = product.id;
   const productName = product.name;
@@ -102,7 +117,33 @@ const ProductInfo: React.FC<Props> = ({ productData, quantity, sizeId }) => {
       </div>
       <div className="my-2 relative flex flex-col sm:flex-row justify-between">
         <ProductPrice sizeId={sizeId} sizes={sizes} />
+        {isSale && saleEndDate && <CountDown targetDate={saleEndDate} />}
       </div>
+      <Separator className="mt-2" />
+      {/* Color Wheel - variant switcher */}
+      <div className="mt-4 space-y-2">
+        <div className="relative flex items-center justify-between text-black font-bold">
+          <span className="flex items-center gap-x-2">
+            {colors!.length > 1 ? "Colors" : "Color"}
+            <ColorWheel colors={colors!} size={25} />
+          </span>
+        </div>
+        {variants!.length > 0 && (
+          <ProductVariantSelector variants={variants} slug={variantSlug} />
+        )}
+      </div>
+
+      {/* Size selector */}
+      <div className="space-y-2 pb-2 mt-4">
+        <div className="">
+          <h1 className="text-gray-800 font-bold">Size</h1>
+        </div>
+        <SizeSelector sizeId={sizeId} sizes={sizes!} />
+      </div>
+
+      {/* Product assurance */}
+      <Separator className="mt-2" />
+      <ProductAssurancePoliy />
     </div>
   );
 };

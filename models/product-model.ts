@@ -25,6 +25,7 @@ export interface ProductVariantModelInput {
   sizes?: ProductSizeModelInput[];
   colors?: ProductColorsModelInput[];
   images: ProductVariantImagesModelInput[];
+  product_id?: string;
   variant_specs?: VariantSpecsModel[];
   name: string;
   variant_image?: string;
@@ -33,6 +34,7 @@ export interface ProductVariantModelInput {
   keywords?: string[];
   is_sale?: boolean;
   sale_end_date?: string;
+  url?: string;
   sku?: string;
   sales?: number;
   created_at?: string;

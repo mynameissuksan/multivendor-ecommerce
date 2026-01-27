@@ -28,7 +28,7 @@ const ProductCard = ({ product }: { product: ProductModelInput }) => {
         >
           {/* Image Swiper */}
           <ProductCardImageSwiper
-            images={variant?.images}
+            images={variant.images}
             selectedIndex={selectedImageIndex}
           />
 
