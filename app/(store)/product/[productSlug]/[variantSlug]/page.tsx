@@ -1,4 +1,6 @@
 import ProductPageContainer from "@/components/store/product-page/container";
+import ProductDescription from "@/components/store/product-page/product-info/product-description";
+import ProductSpecs from "@/components/store/product-page/product-info/product-specs";
 import RelatesProducts from "@/components/store/product-page/product-info/related-product";
 import { Separator } from "@/components/ui/separator";
 import { getProductPageData, getProducts } from "@/queries/product";
@@ -18,7 +20,7 @@ export default async function ProductVariantPage({
   const { productSlug, variantSlug } = await params;
   const sizeId = (await searchParams).size;
   // fetch product data based
-  const productData = await getProductPageData(productSlug, variantSlug);
+  const productData = await getProductPageData(productSlug);
 
   // if no product data is found, show the 404 not found page
   if (!productData) {
@@ -49,7 +51,7 @@ export default async function ProductVariantPage({
     );
   }
 
-  const { specs, products, questions } = productData;
+  const { questions, variantSpecs, productSpecs } = productData;
 
   const relatedProducts = await getProducts(
     {
@@ -81,16 +83,15 @@ export default async function ProductVariantPage({
           <>
             <Separator className="mt-6" />
             {/* Product description */}
-            Product description
+            <ProductDescription
+              text={[product.description!, selectedVariant.description!]}
+            />
           </>
-          {specs.length > 0 ||
-            (products[0].product_varian.length > 0 && (
-              <>
-                <Separator className="mt-6" />
-                {/* Specs table */}
-                Specs table
-              </>
-            ))}
+          <>
+            <Separator className="mt-6" />
+            {/* Specs table */}
+            <ProductSpecs variant={variantSpecs} product={productSpecs} />
+          </>
           {questions && questions.length > 0 && (
             <>
               <Separator className="mt-6" />

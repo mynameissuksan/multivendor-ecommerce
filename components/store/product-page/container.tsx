@@ -93,11 +93,11 @@ const ProductPageContainer: React.FC<Props> = ({
     setIsProductValid(check);
   }, [productToBeAddedToCart]);
 
-  console.log(
-    "stock ---->",
-    productToBeAddedToCart.stock,
-    productToBeAddedToCart.quantity,
-  );
+  // console.log(
+  //   "stock ---->",
+  //   productToBeAddedToCart.stock,
+  //   productToBeAddedToCart.quantity,
+  // );
 
   return (
     <div className="relative">
@@ -185,7 +185,7 @@ const ProductPageContainer: React.FC<Props> = ({
           </div>
         </div>
       </div>
-      <div className="w-[calc(100%-309px)] mt-6 pb-16 ">{children}</div>
+      <div className="w-full mt-6 pb-16 ">{children}</div>
     </div>
   );
 };

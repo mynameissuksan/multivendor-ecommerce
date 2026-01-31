@@ -80,7 +80,7 @@ export interface ProductSpecsModel {
   value: string;
 }
 
-interface VariantSpecsModel {
+export interface VariantSpecsModel {
   id?: string;
   name: string;
   value: string;

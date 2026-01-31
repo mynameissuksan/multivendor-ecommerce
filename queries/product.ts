@@ -6,6 +6,7 @@ import {
   ProductVariantImagesModelInput,
   ProductVariantModelInput,
   QuestionsModel,
+  VariantSpecsModel,
 } from "@/models/product-model";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -504,11 +505,20 @@ async function queryVariantByProductId(productId: string[]) {
   return variantRows;
 }
 
-async function queryVariantSpecs(variantIds: string[]) {
+async function queryVariantSpecs(variantIds: string) {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT id, name, value FROM specs WHERE variant_id IN (?)`,
+    `SELECT id, name, value FROM specs WHERE variant_id = ?`,
     [variantIds],
   );
+  return rows;
+}
+
+async function queryProductSpecs(productId: string) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT id, name, value FROM specs WHERE product_id = ?`,
+    [productId],
+  );
+
   return rows;
 }
 
@@ -863,10 +873,7 @@ export const getProductBySlug = async (slug: string) => {
 
 // getProductPageData
 // Retrieves datails of a specific product variant from the db
-export const getProductPageData = async (
-  productSlug: string,
-  variantSlug: string,
-) => {
+export const getProductPageData = async (productSlug: string) => {
   // Retrieve product variant details from the db
   const product = await retrieveProductDetails(productSlug);
 
@@ -938,13 +945,15 @@ export const retrieveProductDetails = async (productSlug: string) => {
   const variantIds = [...new Set(variantRows.map((row) => row.variant_id))];
 
   // Query related data in parallel
-  const [images, colors, sizes, specs, questions] = await Promise.all([
-    queryVariantImages(variantIds),
-    queryVariantColors(variantIds),
-    queryVariantSizes(variantIds),
-    queryVariantSpecs(variantIds),
-    queryQuestions([rows[0].product_id]),
-  ]);
+  const [images, colors, sizes, variantSpecs, questions, productSpecs] =
+    await Promise.all([
+      queryVariantImages(variantIds),
+      queryVariantColors(variantIds),
+      queryVariantSizes(variantIds),
+      queryVariantSpecs(variantIds[0]),
+      queryQuestions([rows[0].product_id]),
+      queryProductSpecs(rows[0].product_id),
+    ]);
 
   // Map products data with ordered variants
   const products = mapProductsData(
@@ -962,7 +971,8 @@ export const retrieveProductDetails = async (productSlug: string) => {
       offer_tag_name: rows[0].oft_name as string,
       offer_tag_url: rows[0].oft_url as string,
     },
-    specs: specs as ProductSpecsModel[],
+    productSpecs: productSpecs as ProductSpecsModel[],
+    variantSpecs: variantSpecs as VariantSpecsModel[],
     questions: questions as QuestionsModel[],
     followersCount: 10,
     isUserFollowingStore: true,

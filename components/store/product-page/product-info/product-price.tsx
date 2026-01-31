@@ -31,7 +31,7 @@ const ProductPrice: React.FC<Props> = ({
     ? safeSizes!.find((size) => size.id === sizeId)
     : undefined;
 
-  console.log("size", sizeId);
+  // console.log("size", sizeId);
 
   //   calculate the price after discount
   const discountedPrice = selectedSize
