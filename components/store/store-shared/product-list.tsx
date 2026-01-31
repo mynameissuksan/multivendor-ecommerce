@@ -10,9 +10,16 @@ interface Props {
   title?: string;
   link?: string;
   arrow?: boolean;
+  isShowVariant?: boolean;
 }
 
-const ProductList: React.FC<Props> = ({ products, title, link, arrow }) => {
+const ProductList: React.FC<Props> = ({
+  products,
+  title,
+  link,
+  arrow,
+  isShowVariant,
+}) => {
   const Title = () => {
     return link ? (
       <Link href={link}>
@@ -41,7 +48,11 @@ const ProductList: React.FC<Props> = ({ products, title, link, arrow }) => {
           )}
         >
           {products.map((product, i) => (
-            <ProductCard key={i} product={product} />
+            <ProductCard
+              key={i}
+              product={product}
+              isShowVariant={isShowVariant}
+            />
           ))}
         </div>
       ) : (

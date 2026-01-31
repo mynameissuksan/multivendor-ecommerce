@@ -1,21 +1,57 @@
+"use client";
+
+/* eslint-disable react-hooks/rules-of-hooks */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { CartProductType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ProductSizeModelInput } from "@/models/product-model";
 import { usePathname, useRouter } from "next/navigation";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 interface Props {
   sizeId?: string | undefined;
   sizes?: ProductSizeModelInput[];
   isCard?: boolean;
+  handleChange?: (property: keyof CartProductType, value: any) => void;
 }
 
-const ProductPrice: React.FC<Props> = ({ sizeId, sizes, isCard }) => {
-  // get the current URL path
-  const pathname = usePathname();
+const ProductPrice: React.FC<Props> = ({
+  sizeId,
+  sizes,
+  isCard,
+  handleChange,
+}) => {
+  const lastRef = React.useRef<{ price?: number; stock?: number }>({});
 
-  //   Destructure the replace method from useRouter hook
-  const { replace } = useRouter();
+  const safeSizes = sizes ?? [];
+
+  //   sizeId passed, find the specific size and return its details
+  const selectedSize = sizeId
+    ? safeSizes!.find((size) => size.id === sizeId)
+    : undefined;
+
+  console.log("size", sizeId);
+
+  //   calculate the price after discount
+  const discountedPrice = selectedSize
+    ? selectedSize!.price * (1 - selectedSize!.discount / 100)
+    : undefined;
+
+  React.useEffect(() => {
+    //  ไม่มี selectedSize ก็ไม่ทำอะไร
+    if (!selectedSize || discountedPrice == null) return;
+
+    //  กัน set ซ้ำจนเกิด loop (โดยเฉพาะถ้า handleChange ไป setState แล้วทำให้ re-render)
+    const next = { price: discountedPrice, stock: selectedSize.quantity };
+    const prev = lastRef.current;
+
+    if (prev.price === next.price && prev.stock === next.stock) return;
+
+    lastRef.current = next;
+    handleChange!("price", next.price);
+    handleChange!("stock", next.stock);
+  }, [discountedPrice, handleChange, selectedSize]);
 
   //   Check if the sizes array is either undefined or empty
   if (!sizes || sizes.length === 0) {
@@ -82,22 +118,17 @@ const ProductPrice: React.FC<Props> = ({ sizeId, sizes, isCard }) => {
     );
   }
 
-  //   sizeId passed, find the specific size and return its details
-  const selectedSize = sizes.find((size) => size.id === sizeId);
+  // if selected size is not found, short-circuit
   if (!selectedSize) {
     return <div></div>;
   }
-
-  //   cacalute the price after discount
-  const discountedPrice =
-    selectedSize.price * (1 - selectedSize.discount / 100);
 
   return (
     <div>
       <div className="text-orange-400 inline-block font-bold leading-none mr-2.5">
         {/* discounted price */}
         <span className="inline-block text-4xl">
-          ฿{discountedPrice.toFixed(2)}
+          ฿{discountedPrice?.toFixed(2)}
         </span>
       </div>
       {/* original price */}

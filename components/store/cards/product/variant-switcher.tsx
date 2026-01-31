@@ -11,13 +11,17 @@ interface Props {
   images: ProductVariantImagesModelInput[];
   setSelectedImageIndex: Dispatch<SetStateAction<number>>;
   selectedImageIndex: number;
+  isShowVariant?: boolean;
 }
 
 const VariantSwitcher: React.FC<Props> = ({
   images,
   setSelectedImageIndex,
   selectedImageIndex,
+  isShowVariant,
 }) => {
+  if (!isShowVariant) return null;
+
   return (
     <div>
       {images && images.length > 1 && (

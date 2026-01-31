@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { ProductPageDataType } from "@/lib/types";
+import { CartProductType, ProductPageDataType } from "@/lib/types";
 import { CopyIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,7 +9,7 @@ import React from "react";
 import toast from "react-hot-toast";
 import { Rating } from "react-simple-star-rating";
 import ProductPrice from "./product-price";
-import CountDown from "../store-shared/countdown";
+import CountDown from "../../store-shared/countdown";
 import { Separator } from "@/components/ui/separator";
 import ColorWheel from "@/components/shared/color-wheel";
 import ProductVariantSelector from "./variant-selector";
@@ -21,6 +22,7 @@ interface Props {
   quantity?: number;
   sizeId: string | undefined;
   variantSlug: string;
+  handleChange: (property: keyof CartProductType, value: any) => void;
 }
 
 const ProductInfo: React.FC<Props> = ({
@@ -28,6 +30,7 @@ const ProductInfo: React.FC<Props> = ({
   quantity,
   sizeId,
   variantSlug,
+  handleChange,
 }) => {
   if (!productData) return;
 
@@ -115,8 +118,13 @@ const ProductInfo: React.FC<Props> = ({
           </Link>
         </div>
       </div>
+      {/* Price - Sale countdown */}
       <div className="my-2 relative flex flex-col sm:flex-row justify-between">
-        <ProductPrice sizeId={sizeId} sizes={sizes} />
+        <ProductPrice
+          sizeId={sizeId}
+          sizes={sizes}
+          handleChange={handleChange}
+        />
         {isSale && saleEndDate && <CountDown targetDate={saleEndDate} />}
       </div>
       <Separator className="mt-2" />
@@ -138,7 +146,11 @@ const ProductInfo: React.FC<Props> = ({
         <div className="">
           <h1 className="text-gray-800 font-bold">Size</h1>
         </div>
-        <SizeSelector sizeId={sizeId} sizes={sizes!} />
+        <SizeSelector
+          sizeId={sizeId}
+          sizes={sizes!}
+          handleChage={handleChange}
+        />
       </div>
 
       {/* Product assurance */}

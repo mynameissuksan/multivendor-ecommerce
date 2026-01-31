@@ -54,7 +54,7 @@ export const columns: ColumnDef<ProductModelInput>[] = [
             {row.original?.name}
           </h1>
           {/* Product variants */}
-          <div className="relative flex flex-wrap gap-2">
+          <div className="relative flex h-ful flex-wrap gap-2">
             {row.original.product_varian.length > 0 &&
               row.original.product_varian.map((variant, i) => (
                 <div key={i} className="flex flex-col gap-y-2 group">

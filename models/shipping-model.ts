@@ -19,3 +19,19 @@ export interface CountryWithShippingRateModel {
   countryName?: string;
   shippingRate: ShippingRate;
 }
+
+export interface FreeShippingModel {
+  id?: string;
+  product_id?: string;
+  free_shipping_country?: FreeShippingCountry[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface FreeShippingCountry {
+  id: string;
+  country_id: string;
+  free_shipping_id: string;
+  created_at: string;
+  updated_at: string;
+}

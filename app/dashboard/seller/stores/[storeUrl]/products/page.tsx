@@ -16,6 +16,8 @@ const SellerProductPage = async ({
   const products = await getAllStoreProducts(storeUrl);
   const categories = await getAllCategories();
 
+  // console.log('product', products)
+
   return (
     <DataTable
       heading="Products"

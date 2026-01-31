@@ -6,11 +6,11 @@ const StoreHomePage = async () => {
   const productsData = await getProducts();
   const products = Array.isArray(productsData)
     ? productsData
-    : productsData?.products ?? [];
+    : (productsData?.products ?? []);
 
   return (
     <div className="p-14">
-      <ProductList products={products} title="Products" arrow />
+      <ProductList products={products} title="Products" arrow isShowVariant />
     </div>
   );
 };

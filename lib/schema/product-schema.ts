@@ -106,7 +106,7 @@ export const ProductFormSchema = z.object({
         sizes.every((s) => s.size.length > 0 && s.price > 0 && s.quantity > 0),
       {
         message: "All size inputs must be filled correctly.",
-      }
+      },
     ),
   product_specs: z
     .object({
@@ -134,12 +134,15 @@ export const ProductFormSchema = z.object({
     }),
   isSale: z.boolean().default(false).optional(),
   saleEndDate: z.string().optional(),
+  weight: z.number().min(0.01, {
+    message: "Please provide a valid product weight.",
+  }),
   questions: z
     .array(
       z.object({
         question: z.string().optional(),
         answer: z.string().optional(),
-      })
+      }),
     )
     .optional(),
 });

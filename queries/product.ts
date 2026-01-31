@@ -15,10 +15,16 @@ import {
   ProductModelInput,
   ProductSizeModelInput,
 } from "@/models/product-model";
-import { StoreModel } from "@/models/store-model";
+import { StoreModel, StoreModelInput } from "@/models/store-model";
 import { currentUser } from "@clerk/nextjs/server";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import slugify from "slugify";
+
+// Cookies
+import { getCookie } from "cookies-next";
+import { cookies } from "next/headers";
+import { FreeShippingModel, ShippingRate } from "@/models/shipping-model";
+import ShippingRateDetails from "@/components/dashboard/forms/shipping-rate-details";
 
 const productVariantSqlColumn = `
    -- Variant Info
@@ -32,6 +38,7 @@ const productVariantSqlColumn = `
        pv.sales AS variant_sales,
        pv.sale_end_date,
        pv.product_id as variant_product_id,
+       pv.weight as variant_weight,
        pv.variant_image AS variant_image `;
 
 const categorySqlColumn = `    
@@ -179,7 +186,7 @@ export const upsertProduct = async (
       // Updated existing variant
 
       await conn.query<ResultSetHeader>(
-        "UPDATE products_variant SET name = ?, description = ?, slug = ?, keywords = ?, is_sale = ?, sku = ?, variant_image = ?, sale_end_date = ? WHERE id = ?",
+        "UPDATE products_variant SET name = ?, description = ?, slug = ?, keywords = ?, is_sale = ?, sku = ?, variant_image = ?, sale_end_date = ?, weight = ? WHERE id = ?",
         [
           variant.name,
           variant.description,
@@ -189,6 +196,7 @@ export const upsertProduct = async (
           variant.sku,
           variant.variant_image,
           variant.sale_end_date,
+          variant.weight,
           variant.id,
         ],
       );
@@ -198,7 +206,7 @@ export const upsertProduct = async (
       // Insert new variant
 
       await conn.query<ResultSetHeader>(
-        "INSERT INTO products_variant (product_id, name, description, slug, keywords, is_sale, sku, variant_image, sale_end_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO products_variant (product_id, name, description, slug, keywords, is_sale, sku, variant_image, sale_end_date, weight) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           productId,
           variant.name,
@@ -209,6 +217,7 @@ export const upsertProduct = async (
           variant.sku,
           variant.variant_image,
           variant.sale_end_date,
+          variant.weight,
         ],
       );
 
@@ -419,22 +428,20 @@ async function getStoreIdByUrl(storeUrl: string): Promise<string> {
 }
 
 // Query products พร้อมข้อมูล related tables
-async function queryProducts(storeId: string) {
+async function queryAllProductsStore(storeId: string) {
   try {
     const sql = `SELECT 
        ${productSqlColumn},
        ${categorySqlColumn},
        ${subCategorySqlColumn},
-       ${productVariantSqlColumn},
        ${storeSqlColumn}
 
      FROM products p
      INNER JOIN categories c ON p.category_id = c.id
      INNER JOIN sub_categories sc ON p.sub_category_id = sc.id
-     INNER JOIN products_variant pv ON p.id = pv.product_id
      INNER JOIN stores s ON p.store_id = s.id
      WHERE s.id = ?
-     ORDER BY p.id, pv.id`;
+     ORDER BY p.id`;
 
     const [rows] = await pool.query<RowDataPacket[]>(sql, [storeId]);
 
@@ -454,6 +461,8 @@ async function queryVariantImages(variantIds: string[]) {
      WHERE products_variant_id IN (?)`,
     [variantIds],
   );
+
+  // console.log('variantId ====> ',variantIds)
 
   return rows;
 }
@@ -487,9 +496,9 @@ async function queryVariantSizes(variantIds: string[]) {
   return rows;
 }
 
-async function queryVariantByProductId(productId: string) {
+async function queryVariantByProductId(productId: string[]) {
   const [variantRows] = await pool.query<RowDataPacket[]>(
-    `SELECT ${productVariantSqlColumn} FROM products_variant pv WHERE product_id = ? ORDER BY pv.id`,
+    `SELECT ${productVariantSqlColumn} FROM products_variant pv WHERE product_id IN (?) ORDER BY pv.id`,
     [productId],
   );
   return variantRows;
@@ -504,7 +513,6 @@ async function queryVariantSpecs(variantIds: string[]) {
 }
 
 // query questions
-
 async function queryQuestions(productId: string[]) {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT id, question, answer FROM questions WHERE product_id IN (?)`,
@@ -519,6 +527,7 @@ function mapProductsData(
   colors: RowDataPacket[],
   sizes: RowDataPacket[],
   variantRows?: RowDataPacket[],
+  freeShipping?: FreeShippingModel,
 ): ProductModelInput[] {
   // สร้าง Map เพื่อ group products
   const productMap = new Map<string, ProductModelInput>();
@@ -534,6 +543,8 @@ function mapProductsData(
         brand: row.product_brand,
         rating: row.product_rating,
         sales: row.product_sales,
+
+        free_shipping: freeShipping,
 
         stores: {
           id: row.store_id,
@@ -565,6 +576,7 @@ function mapProductsData(
               description: v.variant_description,
               slug: v.variant_slug,
               keywords: v.variant_keywords,
+              weight: v.variant_weight,
               is_sale: v.variant_is_sale,
               sku: v.variant_sku,
               sales: v.variant_sales,
@@ -622,7 +634,7 @@ export async function getAllStoreProducts(
     const storeId = await getStoreIdByUrl(storeUrl);
 
     // 2. Query products และ variants
-    const productRows = await queryProducts(storeId);
+    const productRows = await queryAllProductsStore(storeId);
 
     // console.log("productRows", productRows);
 
@@ -631,10 +643,16 @@ export async function getAllStoreProducts(
     }
 
     // 3. เก็บ variant IDs ทั้งหมด
-    const variantIds = [...new Set(productRows.map((row) => row.variant_id))];
-    // const variantIds = productRows.map((row) => row.variant_id);
+    // const variantIds = [...new Set(productRows.map((row) => row.variant_id))];
+    const productsIds = productRows.map((row) => row.product_id);
+
+    const variantRows = await queryVariantByProductId(productsIds);
+
+    // console.log("variantRows ----> ", variantRows);
 
     // console.log("variantIds", variantIds);
+
+    const variantIds = variantRows.map((v) => v.variant_id);
 
     // 4. Query related data แบบ parallel
     const [images, colors, sizes] = await Promise.all([
@@ -644,7 +662,13 @@ export async function getAllStoreProducts(
     ]);
 
     // 5. Map ข้อมูลเป็น ProductModelInput
-    const products = mapProductsData(productRows, images, colors, sizes);
+    const products = mapProductsData(
+      productRows,
+      images,
+      colors,
+      sizes,
+      variantRows,
+    );
 
     // console.log('products',products)
 
@@ -691,6 +715,38 @@ export const getProducts = async (
   const limit = Math.max(1, Math.min(pageSize, 50));
   const offset = (currentPage - 1) * limit;
 
+  const whereClause: string[] = [];
+  const values: string[] = [];
+
+  // Apply category filter where url
+  if (filters.category) {
+    const [category] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM categories WHERE url = ? LIMIT 1",
+      [filters.category],
+    );
+
+    if (category.length !== 0) {
+      whereClause.push(" WHERE p.category_id = ? ");
+      values.push(category[0].id);
+    }
+  }
+
+  // Apply sub category filter where url
+  if (filters.subCategory) {
+    const [sub] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM sub_categories WHERE url = ? LIMIT 1",
+      [filters.subCategory],
+    );
+
+    if (sub.length !== 0) {
+      whereClause.push(" WHERE p.sub_category_id = ? ");
+      values.push(sub[0].id);
+    }
+
+    // console.log("whereClause ====> ", whereClause);
+    // console.log("values ====> ", values);
+  }
+
   const sql = `
     SELECT 
        ${productSqlColumn},
@@ -702,11 +758,16 @@ export const getProducts = async (
      INNER JOIN categories c ON p.category_id = c.id
      INNER JOIN sub_categories sc ON p.sub_category_id = sc.id
      INNER JOIN stores s ON p.store_id = s.id
+     ${whereClause}
      ORDER BY p.id DESC
      LIMIT ? OFFSET ?
   `;
 
-  const [rows] = await pool.query<RowDataPacket[]>(sql, [limit, offset]);
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [
+    ...values,
+    limit,
+    offset,
+  ]);
 
   // Transform the products with filtered variants into ProductsCartType structure
   // const productWithFilteredVariants = rows.map((product) => {
@@ -715,16 +776,12 @@ export const getProducts = async (
   //   // Extract variant images for the prdouct
   // });
 
-  if (rows.length === 0) {
-    return [];
-  }
+  if (rows.length === 0) return;
 
   const [variantRows] = await pool.query<RowDataPacket[]>(
-    `SELECT ${productVariantSqlColumn} FROM products_variant pv WHERE product_id IN (?)`,
+    `SELECT ${productVariantSqlColumn} FROM products_variant pv WHERE pv.product_id IN (?) AND pv.is_sale = 1`,
     [rows.map((r) => r.product_id)],
   );
-
-  // console.log("variantRows", variantRows);
 
   const variantIds = variantRows.map((row) => row.variant_id);
 
@@ -745,7 +802,7 @@ export const getProducts = async (
   const totalPages = Math.ceil(totalCount / limit);
 
   return {
-    products: products,
+    products,
     totalPages,
     currentPage,
     totalCount,
@@ -808,18 +865,29 @@ export const getProductBySlug = async (slug: string) => {
 // Retrieves datails of a specific product variant from the db
 export const getProductPageData = async (
   productSlug: string,
+  variantSlug: string,
 ) => {
   // Retrieve product variant details from the db
   const product = await retrieveProductDetails(productSlug);
+
   if (!product) return;
 
-  return product;
+  const userCountry = await getUserCountry();
+
+  const productShippingDetails = await getShippingDetails(
+    product.shippingFeeMethod,
+    userCountry,
+    product.store!,
+    product.freeShipping,
+  );
+
+  // console.log(productShippingDetails)
+
+  return { ...product, shippingDetails: productShippingDetails };
 };
 
 // helper funcitons
-export const retrieveProductDetails = async (
-  productSlug: string
-) => {
+export const retrieveProductDetails = async (productSlug: string) => {
   const sql = `
      SELECT 
        ${productSqlColumn},
@@ -831,7 +899,8 @@ export const retrieveProductDetails = async (
      oft.id as oft_id,
      oft.name as oft_name,
      oft.url as oft_url,
-     s.logo as store_logo
+     s.logo as store_logo,
+     p.shipping_fee_method
      
      FROM products p
      LEFT JOIN offer_tags oft ON p.offer_tag_id = oft.id
@@ -849,13 +918,24 @@ export const retrieveProductDetails = async (
   }
 
   // Query all variants for this product
-  const variantRows = await queryVariantByProductId(rows[0].product_id);
+  const [variantRows] = await pool.query<RowDataPacket[]>(
+    `SELECT ${productVariantSqlColumn} FROM products_variant pv WHERE pv.product_id = ? AND pv.is_sale = 1 ORDER BY pv.id`,
+    [rows[0].product_id],
+  );
+
+  // console.log(variantRows)
+
+  // get free shipping
+  const freeShipping = await queryFreeShipping(rows[0].product_id);
 
   if (variantRows.length === 0) {
-    throw new Error("No variants found for this product");
+    // throw new Error("No variants found for this product");
+    return;
   }
 
-  const variantIds = variantRows.map((row) => row.variant_id);
+  // console.log("variantRows ", variantRows);
+
+  const variantIds = [...new Set(variantRows.map((row) => row.variant_id))];
 
   // Query related data in parallel
   const [images, colors, sizes, specs, questions] = await Promise.all([
@@ -873,6 +953,7 @@ export const retrieveProductDetails = async (
     colors,
     sizes,
     variantRows,
+    freeShipping,
   );
 
   return {
@@ -891,8 +972,171 @@ export const retrieveProductDetails = async (
       ratingStatistic: [],
       reviewWithImageCount: 5,
     },
-    shippingDetails: {},
+
     relatedProducts: [],
-    products: products
+    products: products,
+    freeShipping: products[0].free_shipping as FreeShippingModel,
+    store: products[0].stores,
+    shippingFeeMethod: rows[0].shipping_fee_method as string,
   };
+};
+
+const getUserCountry = async () => {
+  const userCountryCookie = (await getCookie("userCountry", { cookies })) || "";
+  const defaultCountry = { name: "United States", code: "US" };
+
+  try {
+    const parsedCountry = JSON.parse(userCountryCookie);
+    if (
+      parsedCountry &&
+      typeof parsedCountry === "object" &&
+      "name" in parsedCountry &&
+      "code" in parsedCountry
+    ) {
+      return parsedCountry;
+    }
+    return defaultCountry;
+  } catch (error) {
+    console.log("Failed to parse userCountryCookie", error);
+  }
+};
+
+// Retrieves and calculates shipping details based on user country and product.
+export const getShippingDetails = async (
+  shippingFeeMethod: string,
+  userCountry: { name: string; code: string; city: string },
+  store: StoreModelInput,
+  freeShipping: FreeShippingModel,
+) => {
+  let shippingDetails = {
+    shippingFeeMethod,
+    shippingService: "",
+    shippingFee: 0,
+    extraShippingFee: 0,
+    deliveryTimeMin: 0,
+    deliveryTimeMax: 0,
+    returnPolicy: "",
+    countryCode: userCountry.code,
+    countryName: userCountry.name,
+    city: userCountry.city,
+    isFreeShipping: false,
+  };
+
+  const [country] = await pool.query<RowDataPacket[]>(
+    "SELECT * FROM countries WHERE name = ? AND code = ? LIMIT 1",
+    [userCountry.name, userCountry.code],
+  );
+
+  if (country.length !== 0) {
+    // Retrieve shipping rate for the country
+    const [shippingRate] = await pool.query<RowDataPacket[]>(
+      "SELECT * FROM shipping_rates WHERE country_id = ? AND store_id = ? LIMIT 1",
+      [country[0].id, store.id],
+    );
+
+    const shipping = shippingRate[0] as ShippingRate;
+
+    const returnPolicy = shipping?.return_policy || store.return_policy;
+    const shippingService =
+      shipping?.shipping_service || store.default_shipping_service;
+    const shippingPerKg =
+      shipping?.shipping_fee_per_kg || store.default_shipping_fee_per_kg;
+    const shippingFeePerItem =
+      shipping?.shipping_fee_per_item || store.default_shipping_fee_per_item;
+    const shippingFeeForAdditionItem =
+      shipping?.shipping_fee_additional_item ||
+      store.default_shipping_fee_for_addional_item;
+    const shippingFeeFixed =
+      shipping?.shipping_fee_fixed || store.default_shipping_fee_fixed;
+    const deliveryTimeMin =
+      shipping?.delivery_time_min || store.default_delivery_time_min;
+    const deliveryTimeMax =
+      shipping?.delivery_time_max || store.default_delivery_time_max;
+
+    // check for free shipping
+    if (freeShipping) {
+      const freeShippingCountries = freeShipping.free_shipping_country;
+      const checkFreeShipping = freeShippingCountries?.find(
+        (c) => c.country_id === country[0].id,
+      );
+
+      if (checkFreeShipping) {
+        shippingDetails.isFreeShipping = true;
+      }
+    } else {
+      shippingDetails = {
+        shippingFeeMethod,
+        shippingService: shippingService || "",
+        shippingFee: 0,
+        extraShippingFee: 0,
+        deliveryTimeMin: deliveryTimeMin || 0,
+        deliveryTimeMax: deliveryTimeMax || 0,
+        returnPolicy: returnPolicy || "",
+        countryCode: userCountry.code,
+        countryName: userCountry.name,
+        city: userCountry.city,
+        isFreeShipping: shippingDetails.isFreeShipping,
+      };
+
+      const { isFreeShipping } = shippingDetails;
+      switch (shippingFeeMethod) {
+        case "ITEM":
+          shippingDetails.shippingFee = isFreeShipping
+            ? 0
+            : shippingFeePerItem || 0;
+          shippingDetails.extraShippingFee = isFreeShipping
+            ? 0
+            : shippingFeeForAdditionItem || 0;
+          break;
+        case "WEIGHT":
+          shippingDetails.shippingFee = isFreeShipping ? 0 : shippingPerKg || 0;
+          break;
+        case "FIXED":
+          shippingDetails.shippingFee = isFreeShipping
+            ? 0
+            : shippingFeeFixed || 0;
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    // console.log("shippingDetails ", shippingDetails);
+
+    return shippingDetails;
+  }
+  return false;
+};
+
+const queryFreeShipping = async (productId: string) => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT 
+        fs.id as fsp_id,
+        fs.product_id,
+
+        fsc.id as fspc_id,
+        fsc.country_id
+        FROM free_shippings fs
+        LEFT JOIN free_shipping_countries fsc ON fsc.free_shipping_id = fs.id
+        WHERE fs.product_id = ? LIMIT 1`,
+      [productId],
+    );
+
+    if (rows.length === 0) return;
+
+    return {
+      id: rows[0].fsp_id as string,
+      product_id: rows[0].product_id as string,
+      free_shipping_country: [
+        {
+          id: rows[0].fspc_id as string,
+          country_id: rows[0].country_id as string,
+        },
+      ],
+    } as FreeShippingModel;
+  } catch (error) {
+    throw error;
+  }
 };

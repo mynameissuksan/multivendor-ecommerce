@@ -1,4 +1,8 @@
+"use client";
+
+/* eslint-disable react-hooks/set-state-in-effect */
 import { ProductColorsModelInput } from "@/models/product-model";
+import { useEffect, useState } from "react";
 
 type ColorWheelProps = {
   colors: ProductColorsModelInput[];
@@ -6,10 +10,22 @@ type ColorWheelProps = {
 };
 
 const ColorWheel: React.FC<ColorWheelProps> = ({ colors, size }) => {
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  // 2
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 1
+  if (!mounted) return null;
+
+  // 3
   const numColors = colors.length;
   const radius = size / 2; // Calculate the radius based on the size
   const sliceAngle = 360 / numColors; // Calculate the angle for each slice of the wheel
 
+  // 3
   return (
     <svg
       width={size}

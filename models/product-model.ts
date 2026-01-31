@@ -1,4 +1,5 @@
 import { CategoryInput } from "./category-model";
+import { FreeShippingModel } from "./shipping-model";
 import { StoreModelInput } from "./store-model";
 import { SubCategoryInput } from "./sub-category-model";
 
@@ -9,9 +10,12 @@ export interface ProductModelInput {
   product_varian: ProductVariantModelInput[];
   product_specs?: ProductSpecsModel[];
   questions?: QuestionsModel[];
+  free_shipping?: FreeShippingModel;
   sub_categories?: SubCategoryInput;
   name: string;
   description?: string;
+
+  shipping_fee_method?: string;
   slug?: string;
   brand: string;
   rating?: number;
@@ -27,6 +31,7 @@ export interface ProductVariantModelInput {
   images: ProductVariantImagesModelInput[];
   product_id?: string;
   variant_specs?: VariantSpecsModel[];
+  weight?: number;
   name: string;
   variant_image?: string;
   description?: string;

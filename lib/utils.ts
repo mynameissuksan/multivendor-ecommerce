@@ -2,6 +2,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import ColorThief from "colorthief";
+import { CartProductType } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -51,4 +52,77 @@ export const getDominantColors = (imgUrl: string): Promise<string[]> => {
       reject(new Error("Failed to load image"));
     };
   });
+};
+
+export const getShippingDateRange = (minDays: number, maxDays: number) => {
+  // Get the current date
+  const currentDate = new Date();
+
+  // calculate minDate by adding to current date
+  const minDate = new Date(currentDate);
+  minDate.setDate(currentDate.getDate() + minDays);
+
+  // calculate minDate by adding to current date
+  const maxDate = new Date(currentDate);
+  maxDate.setDate(currentDate.getDate() + maxDays);
+
+  return {
+    minDate: minDate.toDateString(),
+    maxDate: maxDate.toDateString(),
+  };
+};
+
+// Function to validate the product data before adding it to the cart
+
+export const isProductValidToCart = (product: CartProductType) => {
+  const {
+    productId,
+    variantId,
+    productSlug,
+    variantSlug,
+    name,
+    variantName,
+    images,
+    quantity,
+    price,
+    sizeId,
+    size,
+    shippingFee,
+
+    extraShippingFee,
+    freeShipping,
+    shippingMethod,
+    shippingService,
+    variantImage,
+    weight,
+
+    stock,
+    deliveryTimeMax,
+    deliveryTimeMin,
+  } = product;
+
+  // Ensure that all necessary fields have values
+  if (
+    !productId ||
+    !variantId ||
+    !productSlug ||
+    !variantSlug ||
+    !name ||
+    !variantName ||
+    !images ||
+    quantity <= 0 ||
+    price <= 0 ||
+    !sizeId || // Ensure sizeId is not empty
+    !size || // Ensure size is not empty
+    stock <= 0 ||
+    weight <= 0 || // weight should be > 0
+    !shippingMethod ||
+    !variantImage ||
+    deliveryTimeMin < 0 ||
+    deliveryTimeMax < deliveryTimeMax // Ensure dleivery times are valid
+  ) {
+    return false;
+  }
+
+  return true;
 };

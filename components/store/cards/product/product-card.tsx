@@ -11,9 +11,15 @@ import ProductCardImageSwiper from "./swiper";
 import VariantSwitcher from "./variant-switcher";
 import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
-import ProductPrice from "../../product-page/product-price";
+import ProductPrice from "../../product-page/product-info/product-price";
 
-const ProductCard = ({ product }: { product: ProductModelInput }) => {
+const ProductCard = ({
+  product,
+  isShowVariant,
+}: {
+  product: ProductModelInput;
+  isShowVariant?: boolean;
+}) => {
   const variants = product.product_varian ?? [];
 
   const [variant] = useState<ProductVariantModelInput>(variants[0]);
@@ -61,6 +67,7 @@ const ProductCard = ({ product }: { product: ProductModelInput }) => {
           images={variants[0].images}
           setSelectedImageIndex={setSelectedImageIndex}
           selectedImageIndex={selectedImageIndex}
+          isShowVariant={isShowVariant}
         />
         {/* Action buttons */}
         <div className="flex flex-items-center justify-center px-5 space-x-4">

@@ -83,7 +83,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
   >(
     data?.product_varian[0]?.sizes || [
       { size: "", price: 0, quantity: 0, discount: 0 },
-    ]
+    ],
   );
 
   // console.log('Product size',sizes)
@@ -154,6 +154,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
       saleEndDate:
         data?.product_varian[0]?.sale_end_date ||
         format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+      weight: data?.product_varian[0].weight ?? 0,
     },
   });
 
@@ -230,6 +231,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
       })) ?? [{ question: "", answer: "" }],
       isSale: data.product_varian?.[0]?.is_sale ?? false,
       saleEndDate: data.product_varian?.[0]?.sale_end_date ?? "",
+      weight: data.product_varian[0].weight ?? 0,
     });
   }, [data, form]);
 
@@ -296,8 +298,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
             value: spec.value ?? "",
           })),
           questions: values.questions?.map((q) => ({
-            question: q.question,
-            answer: q.answer,
+            question: q.question ?? "",
+            answer: q.answer ?? "",
           })),
           product_varian: [
             {
@@ -322,10 +324,11 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                 price: s.price,
                 discount: s.discount,
               })),
+              weight: values.weight,
             },
           ],
         },
-        storeUrl
+        storeUrl,
       );
 
       toast("Success", {
@@ -390,7 +393,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                             images={field.value}
                             onRemove={(url) => {
                               field.onChange(
-                                field.value.filter((img) => img.url !== url)
+                                field.value.filter((img) => img.url !== url),
                               );
                             }}
                           />
@@ -408,7 +411,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                             onRemove={(url) =>
                               field.onChange([
                                 ...field.value.filter(
-                                  (curren) => curren.url !== url
+                                  (curren) => curren.url !== url,
                                 ),
                               ])
                             }
@@ -645,6 +648,28 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="weight"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Weight</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Weight"
+                          {...field}
+                          value={field.value ?? 0}
+                          onChange={(value) => {
+                            field.onChange(Number(value.target.value));
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="flex items-center gap-10 py-14">
@@ -672,7 +697,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                               onRemove={(url) =>
                                 field.onChange([
                                   ...field.value.filter(
-                                    (curren) => curren.url !== url
+                                    (curren) => curren.url !== url,
                                   ),
                                 ])
                               }
@@ -850,7 +875,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                               field.onChange(
                                 date
                                   ? format(date, "yyyy-MM-dd'T'HH:mm:ss")
-                                  : ""
+                                  : "",
                               );
                             }}
                             value={field.value ? new Date(field.value) : null}
@@ -875,8 +900,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                 {isLoading
                   ? "Loading..."
                   : data?.id
-                  ? "Save product"
-                  : "Create product"}
+                    ? "Save product"
+                    : "Create product"}
               </Button>
             </form>
           </Form>

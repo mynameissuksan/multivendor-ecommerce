@@ -1,6 +1,7 @@
 import ProductPageContainer from "@/components/store/product-page/container";
+import RelatesProducts from "@/components/store/product-page/product-info/related-product";
 import { Separator } from "@/components/ui/separator";
-import { getProductPageData } from "@/queries/product";
+import { getProductPageData, getProducts } from "@/queries/product";
 import { notFound, redirect } from "next/navigation";
 
 interface PageProps {
@@ -17,7 +18,7 @@ export default async function ProductVariantPage({
   const { productSlug, variantSlug } = await params;
   const sizeId = (await searchParams).size;
   // fetch product data based
-  const productData = await getProductPageData(productSlug);
+  const productData = await getProductPageData(productSlug, variantSlug);
 
   // if no product data is found, show the 404 not found page
   if (!productData) {
@@ -48,11 +49,16 @@ export default async function ProductVariantPage({
     );
   }
 
-  const relatedProducts = {
-    products: [],
-  };
-
   const { specs, products, questions } = productData;
+
+  const relatedProducts = await getProducts(
+    {
+      subCategory: product.sub_categories?.url,
+    },
+    "",
+    1,
+    12,
+  );
 
   return (
     <div>
@@ -62,11 +68,11 @@ export default async function ProductVariantPage({
           sizeId={sizeId}
           variantSlug={variantSlug}
         >
-          {relatedProducts.products && (
+          {relatedProducts && (
             <>
               <Separator />
               {/* Related products */}
-              Related products
+              <RelatesProducts products={relatedProducts.products} />
             </>
           )}
           <Separator className="mt-6" />
