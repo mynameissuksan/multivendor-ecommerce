@@ -1,7 +1,10 @@
+import StoreCard from "@/components/store/cards/store-card";
 import ProductPageContainer from "@/components/store/product-page/container";
 import ProductDescription from "@/components/store/product-page/product-info/product-description";
+import ProductQuestions from "@/components/store/product-page/product-info/product-questions";
 import ProductSpecs from "@/components/store/product-page/product-info/product-specs";
 import RelatesProducts from "@/components/store/product-page/product-info/related-product";
+import StoreProducts from "@/components/store/product-page/product-info/store-product";
 import { Separator } from "@/components/ui/separator";
 import { getProductPageData, getProducts } from "@/queries/product";
 import { notFound, redirect } from "next/navigation";
@@ -51,7 +54,14 @@ export default async function ProductVariantPage({
     );
   }
 
-  const { questions, variantSpecs, productSpecs } = productData;
+  const {
+    questions,
+    variantSpecs,
+    productSpecs,
+    store,
+    followersCount,
+    isUserFollowingStore,
+  } = productData;
 
   const relatedProducts = await getProducts(
     {
@@ -92,18 +102,33 @@ export default async function ProductVariantPage({
             {/* Specs table */}
             <ProductSpecs variant={variantSpecs} product={productSpecs} />
           </>
-          {questions && questions.length > 0 && (
+          {questions.length > 0 && (
             <>
               <Separator className="mt-6" />
               {/* Product Questions */}
-              Product Questions
+              <ProductQuestions questions={questions} />
             </>
           )}
           <Separator className="mt-6" />
           {/* Store card */}
-          Store card
+          {store && (
+            <StoreCard
+              store={{
+                id: store.id!,
+                name: store.name!,
+                url: store.url!,
+                logo: store.logo!,
+                followerCount: followersCount,
+                isUserFollowingStore: isUserFollowingStore,
+              }}
+            />
+          )}
           {/* store products */}
-          store products
+          <StoreProducts
+            storeUrl={store!.url!}
+            storeName={store!.name!}
+            count={6}
+          />
         </ProductPageContainer>
       </div>
     </div>

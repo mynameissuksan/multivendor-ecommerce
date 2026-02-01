@@ -522,6 +522,14 @@ async function queryProductSpecs(productId: string) {
   return rows;
 }
 
+async function queryFollowStoreCountByStoreId(storeId: string) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    "SELECT COUNT(*) as follow_count FROM follows WHERE store_id = ? ",
+    [storeId],
+  );
+  return rows[0].follow_count;
+}
+
 // query questions
 async function queryQuestions(productId: string[]) {
   const [rows] = await pool.query<RowDataPacket[]>(
@@ -530,6 +538,7 @@ async function queryQuestions(productId: string[]) {
   );
   return rows;
 }
+
 // แปลง raw data เป็น ProductModelInput
 function mapProductsData(
   productRows: RowDataPacket[],
@@ -728,6 +737,19 @@ export const getProducts = async (
   const whereClause: string[] = [];
   const values: string[] = [];
 
+  // Apply store filter using store URL
+  if (filters.store) {
+    const [store] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM stores WHERE url = ? LIMIT 1",
+      [filters.category],
+    );
+
+    if (store.length !== 0) {
+      whereClause.push(" WHERE p.store_id = ? ");
+      values.push(store[0].id);
+    }
+  }
+
   // Apply category filter where url
   if (filters.category) {
     const [category] = await pool.query<RowDataPacket[]>(
@@ -895,6 +917,9 @@ export const getProductPageData = async (productSlug: string) => {
 
 // helper funcitons
 export const retrieveProductDetails = async (productSlug: string) => {
+  // get Current user
+  const user = await currentUser();
+
   const sql = `
      SELECT 
        ${productSqlColumn},
@@ -908,6 +933,9 @@ export const retrieveProductDetails = async (productSlug: string) => {
      oft.url as oft_url,
      s.logo as store_logo,
      p.shipping_fee_method
+
+     -- follows info
+     
      
      FROM products p
      LEFT JOIN offer_tags oft ON p.offer_tag_id = oft.id
@@ -932,28 +960,37 @@ export const retrieveProductDetails = async (productSlug: string) => {
 
   // console.log(variantRows)
 
-  // get free shipping
-  const freeShipping = await queryFreeShipping(rows[0].product_id);
-
   if (variantRows.length === 0) {
     // throw new Error("No variants found for this product");
     return;
   }
 
-  // console.log("variantRows ", variantRows);
-
   const variantIds = [...new Set(variantRows.map((row) => row.variant_id))];
 
   // Query related data in parallel
-  const [images, colors, sizes, variantSpecs, questions, productSpecs] =
-    await Promise.all([
-      queryVariantImages(variantIds),
-      queryVariantColors(variantIds),
-      queryVariantSizes(variantIds),
-      queryVariantSpecs(variantIds[0]),
-      queryQuestions([rows[0].product_id]),
-      queryProductSpecs(rows[0].product_id),
-    ]);
+  const [
+    images,
+    colors,
+    sizes,
+    variantSpecs,
+    questions,
+    productSpecs,
+    follower,
+    isUserFollowingStore,
+  ] = await Promise.all([
+    queryVariantImages(variantIds),
+    queryVariantColors(variantIds),
+    queryVariantSizes(variantIds),
+    queryVariantSpecs(variantIds[0]),
+    queryQuestions([rows[0].product_id]),
+    queryProductSpecs(rows[0].product_id),
+    // Fetch store followers
+    queryFollowStoreCountByStoreId(rows[0].store_id),
+    checkIfUserFollowingStore(rows[0].store_id, user?.id),
+  ]);
+
+  // get free shipping
+  const freeShipping = await queryFreeShipping(rows[0].product_id);
 
   // Map products data with ordered variants
   const products = mapProductsData(
@@ -974,8 +1011,8 @@ export const retrieveProductDetails = async (productSlug: string) => {
     productSpecs: productSpecs as ProductSpecsModel[],
     variantSpecs: variantSpecs as VariantSpecsModel[],
     questions: questions as QuestionsModel[],
-    followersCount: 10,
-    isUserFollowingStore: true,
+    followersCount: follower,
+    isUserFollowingStore,
     reviews: [],
     numReviews: 1000,
     reviewsStatistics: {
@@ -1149,4 +1186,20 @@ const queryFreeShipping = async (productId: string) => {
   } catch (error) {
     throw error;
   }
+};
+
+const checkIfUserFollowingStore = async (storeId: string, userId?: string) => {
+  let isUserFollowingStore = false;
+
+  if (userId) {
+    const [storeFollowInfo] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM follows WHERE store_id = ? AND user_id = ? LIMIT 1",
+      [storeId, userId],
+    );
+
+    if (storeFollowInfo.length !== 0) {
+      isUserFollowingStore = true;
+    }
+  }
+  return isUserFollowingStore;
 };

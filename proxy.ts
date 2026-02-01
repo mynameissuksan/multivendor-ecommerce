@@ -3,6 +3,12 @@ import { NextResponse } from "next/server";
 import { getUserCountry } from "./lib/config/ip-info-country";
 
 export default clerkMiddleware(async (auth, req, next) => {
+  const { pathname } = req.nextUrl;
+  // ปล่อย webhook ผ่านไปตรง ๆ
+  if (pathname.startsWith("/api/webhooks")) {
+    return NextResponse.next();
+  }
+
   const protectedRoutes = createRouteMatcher(["/dashboard", "/dashboard(.*)"]);
   if (protectedRoutes(req)) await auth.protect();
 

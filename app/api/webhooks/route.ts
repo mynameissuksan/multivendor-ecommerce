@@ -13,9 +13,11 @@ interface DbUser extends RowDataPacket {
 }
 
 export async function POST(req: NextRequest) {
+  console.log("hook user ");
   try {
-    const evt = await verifyWebhook(req);
-    
+    const evt = await verifyWebhook(req, {
+      signingSecret: process.env.CLERK_WEBHOOK_SECRET!,
+    });
 
     // when user is created or updated
     if (evt.type === "user.created" || evt.type === "user.updated") {
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
 
       const [dbUser] = await pool.query<DbUser[]>(
         "SELECT email, role FROM users WHERE email = ? LIMIT 1",
-        [data?.email_addresses[0]?.email_address]
+        [data?.email_addresses[0]?.email_address],
       );
 
       if (Array.isArray(dbUser) && dbUser.length === 0) {
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
             data.email_addresses[0].email_address,
             data.image_url,
             "USER",
-          ]
+          ],
         );
       } else {
         // console.log("555 role = ", data.private_metadata.role);
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
             data.image_url,
             data.private_metadata.role,
             data.email_addresses[0].email_address,
-          ]
+          ],
         );
       }
 

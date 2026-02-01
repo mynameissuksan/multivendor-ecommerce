@@ -1,9 +1,10 @@
 import { ResultSetHeader, RowDataPacket } from "mysql2";
-
+import { FollowModelInput } from "./follow-model";
 
 export interface StoreModelInput {
   id?: string;
   user_id?: string;
+  follows?: FollowModelInput[];
   name?: string;
   description?: string;
   email?: string;
@@ -78,5 +79,3 @@ export interface StoreResultModel extends ResultSetHeader {
 //   category: CategoryInput[];
 
 // }
-
-
