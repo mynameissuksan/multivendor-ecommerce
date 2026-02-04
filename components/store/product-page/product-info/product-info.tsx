@@ -53,6 +53,8 @@ const ProductInfo: React.FC<Props> = ({
   const productRating = product.rating;
   const numReviews = productData.numReviews;
 
+  const { totalReviews } = productData.reviewsStatistics;
+
   //   copy the sku clipboard
   const copySkuToClipboard = async () => {
     try {
@@ -110,11 +112,11 @@ const ProductInfo: React.FC<Props> = ({
             allowFraction
           />
           <Link href="#reviews" className="text-[#0464ff] hover:underline">
-            {numReviews === 0
+            {totalReviews === 0
               ? "No review yet"
-              : numReviews === 1
+              : totalReviews === 1
                 ? "1 review"
-                : numReviews + " reviews"}
+                : "(" + totalReviews + " reviews)"}
           </Link>
         </div>
       </div>

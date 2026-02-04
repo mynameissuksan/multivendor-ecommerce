@@ -1,4 +1,5 @@
 import { CategoryInput } from "./category-model";
+import { ReviewModelInput } from "./review-model";
 import { FreeShippingModel } from "./shipping-model";
 import { StoreModelInput } from "./store-model";
 import { SubCategoryInput } from "./sub-category-model";
@@ -22,6 +23,7 @@ export interface ProductModelInput {
   sales?: number;
   created_at?: string;
   updated_at?: string;
+  reivews?: ReviewModelInput[];
 }
 
 export interface ProductVariantModelInput {

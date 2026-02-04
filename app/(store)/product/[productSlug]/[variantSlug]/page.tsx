@@ -5,6 +5,7 @@ import ProductQuestions from "@/components/store/product-page/product-info/produ
 import ProductSpecs from "@/components/store/product-page/product-info/product-specs";
 import RelatesProducts from "@/components/store/product-page/product-info/related-product";
 import StoreProducts from "@/components/store/product-page/product-info/store-product";
+import ProductReviews from "@/components/store/product-page/reviews/product-reviews";
 import { Separator } from "@/components/ui/separator";
 import { getProductPageData, getProducts } from "@/queries/product";
 import { notFound, redirect } from "next/navigation";
@@ -61,6 +62,7 @@ export default async function ProductVariantPage({
     store,
     followersCount,
     isUserFollowingStore,
+    reviewsStatistics,
   } = productData;
 
   const relatedProducts = await getProducts(
@@ -71,6 +73,8 @@ export default async function ProductVariantPage({
     1,
     12,
   );
+
+  // console.log(reviewsStatistics)
 
   return (
     <div>
@@ -89,7 +93,12 @@ export default async function ProductVariantPage({
           )}
           <Separator className="mt-6" />
           {/* Product reviews */}
-          Product reviews
+          <ProductReviews
+            productId={product.id!}
+            rating={productData.rating}
+            statistics={productData}
+            reviews={productData.reviews}
+          />
           <>
             <Separator className="mt-6" />
             {/* Product description */}

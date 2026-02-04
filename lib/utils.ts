@@ -126,3 +126,32 @@ export const isProductValidToCart = (product: CartProductType) => {
 
   return true;
 };
+
+// Function to censor names
+
+type CensorReturn = {
+  firstName: string;
+  lastName: string;
+  fullName: string;
+};
+
+function censorName(firstName: string, lastName: string): CensorReturn {
+  const censor = (name: string): string => {
+    if (name.length <= 2) return name;
+
+    const firstChar = name[0];
+    const lastChar = name[name.length - 1];
+
+    // Calculate how many charactoer to censor
+    const middleLength = name.length - 2; // Length of middile characters to censor
+
+    // create censored version
+    return `${firstChar}${"*".repeat(middleLength)}${lastChar}`;
+  };
+
+  return {
+    firstName: censor(firstName),
+    lastName: censor(lastName),
+    fullName: `${firstName[0]}***${lastName[lastName.length - 1]}`,
+  };
+}

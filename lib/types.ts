@@ -1,5 +1,5 @@
 import COUNTRIES from "@/data/countries.json";
-import { getProductPageData, getShippingDetails } from "@/queries/product";
+import { getProductPageData, getRatingStatistics } from "@/queries/product";
 
 export interface DashboardSidebarMenuInterface {
   label: string;
@@ -12,6 +12,10 @@ export type SelectMenuOption = (typeof COUNTRIES)[number];
 export type ProductPageDataType = Awaited<
   ReturnType<typeof getProductPageData>
 >;
+
+export type RatingStatisticsType = Awaited<
+  ReturnType<typeof getRatingStatistics>
+>["ratingStatistics"];
 
 export type CartProductType = {
   productId: string;
@@ -36,3 +40,6 @@ export type CartProductType = {
   deliveryTimeMax: number;
   freeShipping: boolean;
 };
+
+// define a local sortOrder type
+export type SortOrder = "asc" | "desc";

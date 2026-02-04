@@ -25,7 +25,8 @@ import slugify from "slugify";
 import { getCookie } from "cookies-next";
 import { cookies } from "next/headers";
 import { FreeShippingModel, ShippingRate } from "@/models/shipping-model";
-import ShippingRateDetails from "@/components/dashboard/forms/shipping-rate-details";
+import { ReviewModelInput } from "@/models/review-model";
+import { SortOrder } from "@/lib/types";
 
 const productVariantSqlColumn = `
    -- Variant Info
@@ -539,6 +540,82 @@ async function queryQuestions(productId: string[]) {
   return rows;
 }
 
+// query review prdouct
+async function queryReviewsProduct(productId: string) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT 
+     r.id as review_id, 
+     r.variant, 
+     r.review, 
+     r.rating, 
+     r.color, 
+     r.likes,
+     r.size, 
+     r.quantity, 
+     r.created_at, 
+     r.product_id,
+
+     ri.url as image_url,
+     ri.alt as image_review_alt,
+     ri.review_id as ri_review_id,
+
+     u.id as user_id,
+     u.name as user_name,
+     u.email as user_email,
+     u.picture as user_picture,
+     u.role as user_role
+
+     FROM reviews r
+     LEFT JOIN review_images ri ON ri.review_id = r.id
+     INNER JOIN users u ON r.user_id = u.id
+     WHERE r.product_id = ?
+     LIMIT 2`,
+    [productId],
+  );
+
+  const dataMap = new Map<string, ReviewModelInput>();
+  for (const review of rows) {
+    if (!dataMap.has(review.review_id)) {
+      dataMap.set(review.review_id, {
+        id: review.review_id,
+        variant: review.variant,
+        review: review.review,
+        rating: review.rating,
+        color: review.color,
+        size: review.size,
+        quantity: review.quantity,
+        likes: review.likes,
+        created_at: review.created_at,
+        updated_at: review.updated_at,
+        user: {
+          id: review.user_id,
+          name: review.user_name,
+          email: review.user_email,
+          picture: review.user_picture,
+          role: review.user_role,
+        },
+        review_image: [],
+      });
+    }
+    const getMapId = dataMap.get(review.review_id)?.id;
+
+    const filterId = rows.find((f) => f.ri_review_id === getMapId);
+
+    if (filterId) {
+      dataMap.get(review.review_id)?.review_image.push({
+        id: review.ri_review_id,
+        url: review.image_url,
+        alt: review.image_review_alt,
+        review_id: review.review_id,
+      });
+    }
+  }
+
+  // console.log(dataMap);
+
+  return Array.from(dataMap.values());
+}
+
 // แปลง raw data เป็น ProductModelInput
 function mapProductsData(
   productRows: RowDataPacket[],
@@ -967,6 +1044,8 @@ export const retrieveProductDetails = async (productSlug: string) => {
 
   const variantIds = [...new Set(variantRows.map((row) => row.variant_id))];
 
+  const productId = rows[0].product_id;
+
   // Query related data in parallel
   const [
     images,
@@ -977,20 +1056,32 @@ export const retrieveProductDetails = async (productSlug: string) => {
     productSpecs,
     follower,
     isUserFollowingStore,
+    ratingStatistics,
+    freeShipping,
+    reviews,
   ] = await Promise.all([
+    // prodcut variant images
     queryVariantImages(variantIds),
+    // product colors
     queryVariantColors(variantIds),
+    // prodcut sizes
     queryVariantSizes(variantIds),
+    //  product specs
     queryVariantSpecs(variantIds[0]),
-    queryQuestions([rows[0].product_id]),
-    queryProductSpecs(rows[0].product_id),
+    // product qestion
+    queryQuestions([productId]),
+    queryProductSpecs(productId),
     // Fetch store followers
     queryFollowStoreCountByStoreId(rows[0].store_id),
+    // user following store
     checkIfUserFollowingStore(rows[0].store_id, user?.id),
+    // reviews rating
+    getRatingStatistics(productId),
+    // get free shipping
+    queryFreeShipping(productId),
+    // get prdouct reviews list
+    queryReviewsProduct(productId),
   ]);
-
-  // get free shipping
-  const freeShipping = await queryFreeShipping(rows[0].product_id);
 
   // Map products data with ordered variants
   const products = mapProductsData(
@@ -1013,13 +1104,10 @@ export const retrieveProductDetails = async (productSlug: string) => {
     questions: questions as QuestionsModel[],
     followersCount: follower,
     isUserFollowingStore,
-    reviews: [],
+    reviews: reviews,
     numReviews: 1000,
-    reviewsStatistics: {
-      ratingStatistic: [],
-      reviewWithImageCount: 5,
-    },
-
+    reviewsStatistics: ratingStatistics,
+    rating: ratingStatistics.rating,
     relatedProducts: [],
     products: products,
     freeShipping: products[0].free_shipping as FreeShippingModel,
@@ -1201,5 +1289,96 @@ const checkIfUserFollowingStore = async (storeId: string, userId?: string) => {
       isUserFollowingStore = true;
     }
   }
+
   return isUserFollowingStore;
+};
+
+type RatingRow = RowDataPacket & {
+  rating: number;
+  count: number;
+  sum_rating: number;
+};
+
+export const getRatingStatistics = async (productId: string) => {
+  const [rows] = await pool.query<RatingRow[]>(
+    `SELECT rating, COUNT(*) as count, SUM(rating) as sum_rating FROM reviews WHERE product_id = ? GROUP BY rating ORDER BY rating ASC`,
+    [productId],
+  );
+
+  const totalReviews = rows.reduce((sum, r) => sum + Number(r.count), 0);
+  const sumRating = rows.reduce((sum, r) => sum + Number(r.sum_rating), 0);
+
+  // index 0..4 = rating 1..5
+  const ratingCounts = Array(5).fill(0);
+
+  for (const r of rows) {
+    const rating = Number(r.rating);
+    const count = Number(r.count);
+
+    if (rating >= 1 && rating <= 5) {
+      ratingCounts[rating - 1] = count;
+    }
+  }
+
+  const res = {
+    ratingStatistics: ratingCounts.map((count, index) => ({
+      rating: index + 1,
+      numReviews: count as number,
+      percentage:
+        totalReviews > 0 ? Math.floor((count / totalReviews) * 100) : 0,
+    })),
+    reviewsWithImagesCount: 0,
+    totalReviews,
+    rating: sumRating / totalReviews,
+  };
+
+  // console.log(res);
+  return res;
+};
+
+export const getProductFilteredReviews = async (
+  productId: string,
+  filters: { rating?: number; hasImages: boolean },
+  sort: { orderBy: "latest" | "oldest" | "highest" } | undefined,
+  page: number = 1,
+  pageSize: number = 2,
+) => {
+  const reviewFilter: any = {
+    productId,
+  };
+
+  // Apply rating  filter if provided
+
+  if (filters.rating) {
+    const rating = filters.rating;
+    reviewFilter.rating = {
+      in: [rating, rating + 0.5],
+    };
+  }
+
+  // Apply image filter if provided
+  if (filters.hasImages) {
+    reviewFilter.images = {
+      some: {},
+    };
+  }
+
+  // Set sorting order using local SortOrder type
+  const sortOption: { createdAt?: SortOrder; rating: SortOrder } =
+    sort && sort.orderBy === "latest"
+      ? { createdAt: "desc" }
+      : sort && sort.orderBy == "oldest"
+        ? { createdAt: "asc" }
+        : { rating: "desc" };
+
+  // Calculate pagination parameters
+  const offset = (page - 1) * pageSize;
+  const limit = pageSize;
+
+  // Fetch review from the db
+  // join images, users
+  const reviews = await pool.query("SELECT * FROM reviews WHERE order by sortOption")
+
+  return reviews;
+
 };

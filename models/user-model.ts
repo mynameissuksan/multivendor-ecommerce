@@ -4,6 +4,6 @@ export interface UserModel {
   email: string;
   picture: string;
   role: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
