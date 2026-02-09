@@ -12,7 +12,7 @@ const RatingStatisticsCard: React.FC<Props> = ({ statistics }) => {
   return (
     <div className="h-44 flex-1">
       <div className="py-5 px-7 bg-[#f5f5f5] flex flex-col gap-y-2 h-fit justify-center overflow-hidden rounded-lg">
-        {statistics
+        {statistics.ratingStatistics
           .slice()
           .reverse()
           .map((item, i) => {

@@ -1021,6 +1021,7 @@ export const retrieveProductDetails = async (productSlug: string) => {
      INNER JOIN stores s ON p.store_id = s.id
      WHERE p.slug = ? 
      LIMIT 1
+
    `;
 
   const [rows] = await pool.query<RowDataPacket[]>(sql, [productSlug]);
@@ -1082,6 +1083,8 @@ export const retrieveProductDetails = async (productSlug: string) => {
     // get prdouct reviews list
     queryReviewsProduct(productId),
   ]);
+
+  // console.log("ratingStatistics.  ", ratingStatistics);
 
   // Map products data with ordered variants
   const products = mapProductsData(
@@ -1297,16 +1300,21 @@ type RatingRow = RowDataPacket & {
   rating: number;
   count: number;
   sum_rating: number;
+  with_images: number;
 };
 
 export const getRatingStatistics = async (productId: string) => {
   const [rows] = await pool.query<RatingRow[]>(
-    `SELECT rating, COUNT(*) as count, SUM(rating) as sum_rating FROM reviews WHERE product_id = ? GROUP BY rating ORDER BY rating ASC`,
+    `SELECT id, rating, COUNT(*) as count, SUM(rating) as sum_rating, SUM(EXISTS (SELECT 1 FROM review_images ri WHERE ri.review_id = reviews.id)) as with_images FROM reviews WHERE product_id = ? GROUP BY rating ORDER BY rating ASC`,
     [productId],
   );
 
   const totalReviews = rows.reduce((sum, r) => sum + Number(r.count), 0);
   const sumRating = rows.reduce((sum, r) => sum + Number(r.sum_rating), 0);
+  const countWithImage = rows.reduce(
+    (sum, r) => sum + Number(r.with_images),
+    0,
+  );
 
   // index 0..4 = rating 1..5
   const ratingCounts = Array(5).fill(0);
@@ -1327,7 +1335,7 @@ export const getRatingStatistics = async (productId: string) => {
       percentage:
         totalReviews > 0 ? Math.floor((count / totalReviews) * 100) : 0,
     })),
-    reviewsWithImagesCount: 0,
+    reviewsWithImagesCount: countWithImage,
     totalReviews,
     rating: sumRating / totalReviews,
   };
@@ -1338,47 +1346,120 @@ export const getRatingStatistics = async (productId: string) => {
 
 export const getProductFilteredReviews = async (
   productId: string,
-  filters: { rating?: number; hasImages: boolean },
+  filters: { rating?: number; hasImages?: boolean },
   sort: { orderBy: "latest" | "oldest" | "highest" } | undefined,
   page: number = 1,
   pageSize: number = 2,
 ) => {
-  const reviewFilter: any = {
-    productId,
-  };
+  const where: string[] = [];
+  const params: any[] = [];
 
-  // Apply rating  filter if provided
+  // base filter
+  where.push("r.product_id = ?");
+  params.push(productId);
 
-  if (filters.rating) {
-    const rating = filters.rating;
-    reviewFilter.rating = {
-      in: [rating, rating + 0.5],
-    };
+  // rating filter รองรับ 0.5 step
+  if (filters?.rating) {
+    // console.log("------------ filter rating ------------", filters.rating);
+    const rating = Number(filters.rating);
+    // rating+0.5 = 4 or 4.5
+    where.push("r.rating IN (?, ?)");
+    params.push(rating, rating + 0.5);
   }
 
-  // Apply image filter if provided
-  if (filters.hasImages) {
-    reviewFilter.images = {
-      some: {},
-    };
+  // hasImages filter มีอย่างน้อย 1 รูป
+  if (filters?.hasImages) {
+    where.push(
+      "EXISTS (SELECT 1 FROM review_images ri WHERE ri.review_id = r.id)",
+    );
+
+    console.log(" ------- has images ------");
   }
 
-  // Set sorting order using local SortOrder type
-  const sortOption: { createdAt?: SortOrder; rating: SortOrder } =
-    sort && sort.orderBy === "latest"
-      ? { createdAt: "desc" }
-      : sort && sort.orderBy == "oldest"
-        ? { createdAt: "asc" }
-        : { rating: "desc" };
+  // sorting
+  // let orderBySql = "r.created_at DESC";
+  // if (sort?.orderBy === "oldest") {
+  //   console.log("--------------- oldest ---------------");
 
-  // Calculate pagination parameters
+  //   orderBySql = "r.created_at ASC";
+  // }
+  // if (sort?.orderBy === "highest") {
+  //   console.log("--------------- highest ---------------");
+  //   orderBySql = "r.rating DESC, r.created_at DESC";
+  // }
+
   const offset = (page - 1) * pageSize;
   const limit = pageSize;
 
-  // Fetch review from the db
-  // join images, users
-  const reviews = await pool.query("SELECT * FROM reviews WHERE order by sortOption")
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  return reviews;
+  const sql = `
+              SELECT
+              r.id review_id,
+              r.variant,
+              r.review,
+              r.rating,
+              r.color,
+              r.size,
+              r.quantity,
+              r.likes,
 
+              u.id as user_id,
+              u.name as user_name,
+              u.picture,
+
+              ri.alt as review_image_alt,
+              ri.url as review_image_url,
+              ri.review_id as review_image_review_id,
+              ri.id as review_image_id
+
+              FROM reviews r
+              INNER JOIN users u ON u.id = r.user_id
+              LEFT JOIN review_images ri ON ri.review_id = r.id
+              ${whereSql}
+              ORDER BY r.created_at DESC
+              LIMIT ? OFFSET ?
+            `;
+
+  params.push(limit, offset);
+
+  const [rows] = await pool.query<RowDataPacket[]>(sql, params);
+
+  const dataMap = new Map<string, ReviewModelInput>();
+
+  for (const row of rows) {
+    if (!dataMap.has(row.review_id)) {
+      dataMap.set(row.review_id, {
+        id: row.review_id as string,
+        variant: row.variant as string,
+        review: row.review as string,
+        rating: row.rating as number,
+        color: row.color as string,
+        size: row.size as string,
+        quantity: row.quantity as number,
+        likes: row.likes as number,
+        user: {
+          id: row.user_id as string,
+          name: row.user_name as string,
+          picture: row.picture as string,
+          email: "",
+          role: "USER",
+        },
+        review_image: [],
+      });
+    }
+
+    if (row.review_image_id) {
+      dataMap.get(row.review_id)?.review_image.push({
+        id: row.review_image_id as string,
+        url: row.review_image_url as string,
+        alt: row.review_image_alt as string,
+        review_id: row.review_image_review_id as string,
+      });
+    }
+  }
+
+  const mapData = Array.from(dataMap.values());
+
+  return mapData;
 };

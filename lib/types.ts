@@ -15,7 +15,7 @@ export type ProductPageDataType = Awaited<
 
 export type RatingStatisticsType = Awaited<
   ReturnType<typeof getRatingStatistics>
->["ratingStatistics"];
+>;
 
 export type CartProductType = {
   productId: string;
@@ -43,3 +43,12 @@ export type CartProductType = {
 
 // define a local sortOrder type
 export type SortOrder = "asc" | "desc";
+
+export type ReviewFilterType = {
+  rating?: number;
+  hasImages?: boolean;
+};
+
+export type ReviewOrderType = {
+  orderBy: "latest" | "oldest" | "highest";
+};

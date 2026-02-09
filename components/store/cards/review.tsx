@@ -13,14 +13,14 @@ const ReviewCard = ({ review }: { review: ReviewModelInput }) => {
     .filter((color) => color.trim() !== "")
     .map((color) => ({ name: color.trim() }));
 
-  const censorName = `${user.name[0]}***${user.name[user.name.length - 1]}`;
+  const censorName = `${user?.name[0]}***${user?.name[user.name.length - 1]}`;
 
   return (
     <div className="border border-[#d8d8d8] rounded-xl flex h-full relative py-4 px-2.5">
       <div className="w-16 space-y-1">
-        {user.picture && (
+        {user?.picture && (
           <Image
-            src={user.picture}
+            src={user?.picture}
             alt="Profile image"
             width={100}
             height={100}
@@ -51,7 +51,7 @@ const ReviewCard = ({ review }: { review: ReviewModelInput }) => {
             <div className="text-gray-400 text-sm">{review.quantity}</div>
           </div>
           <p className="text-sm">{review.review}</p>
-          {review_image.length > 0 && (
+          {review_image?.length > 0 && (
             <div className="flex flex-wrap  gap-2">
               {review_image.map((img, i) => (
                 <div
