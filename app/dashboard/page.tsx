@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 const DashboardPage = async () => {
   // Get user adn redirect depending on role
   const user = await currentUser();
+
+  console.log("user ===== ", user);
   if (!user?.privateMetadata?.role || user?.privateMetadata.role === "USER")
     redirect("/");
 

@@ -14,12 +14,18 @@ import { ReviewModelInput } from "@/models/review-model";
 import ReviewCard from "../../cards/review";
 import { getProductFilteredReviews } from "@/queries/product";
 import ReviewFilter from "./filters";
+import ReviewSort from "./review-sort";
+import Pagination from "../../store-shared/pagination";
+import AddReview from "./add-review";
+import ReviewDetails from "../../forms/review-details";
+import { ProductVariantModelInput } from "@/models/product-model";
 
 interface Props {
   productId: string;
   rating: number;
   statistics: ProductPageDataType;
   reviews: ReviewModelInput[];
+  variantsInfo: ProductVariantModelInput[];
 }
 
 const ProductReviews: React.FC<Props> = ({
@@ -27,6 +33,7 @@ const ProductReviews: React.FC<Props> = ({
   statistics,
   reviews,
   productId,
+  variantsInfo,
 }) => {
   const [data, setData] = useState<ReviewModelInput[]>(reviews);
 
@@ -47,7 +54,7 @@ const ProductReviews: React.FC<Props> = ({
 
   //   Pagination
   const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(2);
+  const [pageSize, setPageSize] = useState<number>(4);
 
   useEffect(() => {
     if (filters.hasImages || filters.rating || sort) {
@@ -101,9 +108,9 @@ const ProductReviews: React.FC<Props> = ({
                 stats={ratingStatistics!}
               />
               {/* Reviews sort */}
+              <ReviewSort sort={sort} setSort={setSort} />
             </div>
             {/* Reviews  */}
-
             <div className="mt-10  min-h-72 grid grid-cols-2 gap-4">
               {data?.length > 0 ? (
                 <>
@@ -122,9 +129,29 @@ const ProductReviews: React.FC<Props> = ({
                 <>No Reviews.</>
               )}
             </div>
+            {/* {data.length} -{pageSize} */}
             {/* Pagination */}
+            {data.length >= pageSize && (
+              <Pagination
+                page={page}
+                setPage={setPage}
+                totalPages={
+                  filters.rating || filters.hasImages
+                    ? data.length / pageSize
+                    : totalReviews / pageSize
+                }
+              />
+            )}
           </>
         )}
+        <div className="mt-10">
+          <ReviewDetails
+            productId={productId}
+            variantsInfo={variantsInfo}
+            setReviews={setData}
+            reviews={data}
+          />
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { UserModel } from "./user-model";
 
 export interface ReviewModelInput {
   id: string;
-  review_image: ReviewImageModel[];
+  review_image?: ReviewImageModel[];
   user: UserModel;
   variant: string;
   review: string;

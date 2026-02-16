@@ -7,13 +7,19 @@ import React from "react";
 import { Rating } from "react-simple-star-rating";
 
 const ReviewCard = ({ review }: { review: ReviewModelInput }) => {
-  const { review_image, user } = review;
-  const colors = review.color
-    .split(",")
-    .filter((color) => color.trim() !== "")
-    .map((color) => ({ name: color.trim() }));
+  const { user, color } = review;
+  const colorStr = (color ?? "").toString();
 
-  const censorName = `${user?.name[0]}***${user?.name[user.name.length - 1]}`;
+  const colors = colorStr
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((name) => ({ name }));
+
+  const censorName =
+    user && user.name != null
+      ? `${user?.name[0]}***${user?.name[user.name.length - 1]}`
+      : "anonymous";
 
   return (
     <div className="border border-[#d8d8d8] rounded-xl flex h-full relative py-4 px-2.5">
@@ -51,9 +57,9 @@ const ReviewCard = ({ review }: { review: ReviewModelInput }) => {
             <div className="text-gray-400 text-sm">{review.quantity}</div>
           </div>
           <p className="text-sm">{review.review}</p>
-          {review_image?.length > 0 && (
+          {review.review_image && review.review_image!.length > 0 && (
             <div className="flex flex-wrap  gap-2">
-              {review_image.map((img, i) => (
+              {review.review_image!.map((img, i) => (
                 <div
                   key={i}
                   className="w-20 h-20 border border-gray-200 rounded-xl overflow-hidden cursor-pointer"

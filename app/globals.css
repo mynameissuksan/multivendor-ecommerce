@@ -264,3 +264,58 @@
   background: #e0e0e0;
   border-radius: 5px;
 }
+
+
+/* Jodit editor dark mode */
+.jodit_theme_dark.jodit-container {
+  background-color: #1a1b1f !important;
+  border-color: #eeeeee2e !important;
+}
+
+.jodit_theme_dark .jodit-toolbar_box:not(:empty) {
+  background-color: #1a1b1f !important;
+}
+
+.jodit_theme_dark .jodit-wysiwyg {
+  background-color: #1a1b1f !important;
+}
+
+.jodit_theme_dark .jodit-toolbar-button_button:hover svg {
+  stroke: #575757 !important;
+  fill: #575757 !important;
+}
+
+
+/* Calendar dark mode */
+.dark .react-calendar {
+  background-color: #1a1b1f !important;
+}
+
+.dark .react-calendar__tile:enabled:hover{
+  color: #000 !important;
+}
+
+.dark .react-calendar__tile--now:enabled {
+  color: #000 !important;
+}
+
+/* Multi selct dark mode */
+.dark .rmsc .dropdown-container {
+  background-color: #1a1b1f !important;
+  border-color: #eeeeee2e !important;
+}
+
+.panel-content {
+  background-color: #1a1b1f !important;
+}
+
+.panel-content input:focus {
+  background-color: #1a1b1f !important;
+}
+
+.select-item:hover {
+  background-color: #303236 !important;
+}
+.select-item.selected {
+  background-color: #303236 !important;
+}

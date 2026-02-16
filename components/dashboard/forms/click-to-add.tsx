@@ -7,28 +7,28 @@ import React, { Dispatch, SetStateAction, useState } from "react";
 import { SketchPicker } from "react-color";
 
 // define the interface for each detail object
-export interface Detail {
-  [key: string]: string | number | undefined;
+export interface Detail<T = { [key: string]: string | number | undefined }> {
+  [key: string]: T[keyof T];
 }
 
 // define props for the click to add inputs components
-interface ClickToAddInputsProps {
-  details: Detail[]; // Array of details objects
-  setDetails: Dispatch<SetStateAction<Detail[]>>; // Setter function for details
-  initialDetail?: Detail; // Optional inital detail object
-  header: string;
+interface ClickToAddInputsProps<T extends Detail> {
+  details: T[]; // Array of details objects
+  setDetails: Dispatch<SetStateAction<T[]>>; // Setter function for details
+  initialDetail?: T; // Optional inital detail object
+  header?: string;
   colorPicker?: boolean;
 }
 
 // ClickToAddInputs components definition
 
-const ClickToAddInputs: React.FC<ClickToAddInputsProps> = ({
+const ClickToAddInputs = <T extends Detail>({
   details,
   setDetails,
-  initialDetail = {}, // default value for initial detail is an empty object
+  initialDetail = {} as T, // default value for initial detail is an empty object
   header,
   colorPicker,
-}) => {
+}: ClickToAddInputsProps<T>) => {
   // State to manage toggling color picker
   const [colorPickerIndex, setColorPickerIndex] = useState<number | null>(null);
 
@@ -36,11 +36,11 @@ const ClickToAddInputs: React.FC<ClickToAddInputsProps> = ({
   const handleDetailsChanage = (
     index: number,
     property: string,
-    value: string | number
+    value: string | number,
   ) => {
     // update the details array with the new property value
     const updatedDetails = details.map((detail, i) =>
-      i === index ? { ...detail, [property]: value } : detail
+      i === index ? { ...detail, [property]: value } : detail,
     );
 
     setDetails(updatedDetails); // update the state with the modified details
@@ -135,7 +135,7 @@ const ClickToAddInputs: React.FC<ClickToAddInputsProps> = ({
                     className="cursor-pointer"
                     onClick={() =>
                       setColorPickerIndex(
-                        colorPickerIndex === index ? null : index
+                        colorPickerIndex === index ? null : index,
                       )
                     }
                   >
@@ -172,7 +172,7 @@ const ClickToAddInputs: React.FC<ClickToAddInputsProps> = ({
                     property,
                     e.target.type === "number"
                       ? parseFloat(e.target.value)
-                      : e.target.value
+                      : e.target.value,
                   )
                 }
               />

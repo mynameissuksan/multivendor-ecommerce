@@ -13,7 +13,6 @@ interface DbUser extends RowDataPacket {
 }
 
 export async function POST(req: NextRequest) {
-  console.log("hook user ");
   try {
     const evt = await verifyWebhook(req, {
       signingSecret: process.env.CLERK_WEBHOOK_SECRET!,

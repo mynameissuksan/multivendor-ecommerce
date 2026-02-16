@@ -22,7 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Form,
   FormControl,
@@ -50,7 +50,10 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { CategoryModel } from "@/models/category-model";
 import { ProductFormSchema } from "@/lib/schema/product-schema";
-import { ProductModelInput } from "@/models/product-model";
+import {
+  ProductModelInput,
+  SHIPPING_FEE_MOETHOD,
+} from "@/models/product-model";
 import ImagePreviewGrid from "../shared/images-preview-grid";
 import ClickToAddInputs from "./click-to-add";
 import { SubCategoryModel } from "@/models/sub-category-model";
@@ -61,17 +64,40 @@ import { upsertProduct } from "@/queries/product";
 
 // Jodit editor
 import JoditEditor from "jodit-react";
+import InputFieldSet from "@/components/shared/input-fieldset";
+import { Dot } from "lucide-react";
+import { Country } from "@/models/country-model";
+
+import { MultiSelect } from "react-multi-select-component";
+import { useTheme } from "next-themes";
+
+const ShippingFeeMethods = [
+  {
+    value: SHIPPING_FEE_MOETHOD.ITEM,
+    description: "ITEM (Fees calculated based on number of products.)",
+  },
+  {
+    value: SHIPPING_FEE_MOETHOD.WEIGHT,
+    description: "WEIGHT (Fees calculated based on number of weight.)",
+  },
+  {
+    value: SHIPPING_FEE_MOETHOD.FIXED,
+    description: "FIXED (Fees are fixed.)",
+  },
+];
 
 interface ProductDetailsProps {
   data?: ProductModelInput; // store info
   categories: CategoryModel[]; // category info
   storeUrl: string;
+  countries: Country[];
 }
 
 const ProductDetails: React.FC<ProductDetailsProps> = ({
   data,
   categories,
   storeUrl,
+  countries,
 }) => {
   const router = useRouter();
 
@@ -112,6 +138,16 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
   const productDecEditor = useRef(null);
   const variantDecEditor = useRef(null);
 
+  // Jodit configuration
+  const { theme } = useTheme();
+  const config = useMemo(
+    () => ({
+      theme: theme == "dark" ? "dark" : "default",
+      readOnly: false,
+    }),
+    [theme],
+  );
+
   // console.log("Color watch", colors);
 
   // console.log("data?.categories?.id", data?.categories?.id);
@@ -120,7 +156,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
 
   const form = useForm<z.infer<typeof ProductFormSchema>>({
     mode: "onChange",
-    resolver: zodResolver(ProductFormSchema),
+    resolver: zodResolver(ProductFormSchema as any),
     defaultValues: {
       name: data?.name || "",
       description: data?.description || "",
@@ -155,6 +191,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
         data?.product_varian[0]?.sale_end_date ||
         format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
       weight: data?.product_varian[0].weight ?? 0,
+      freeShippingForAllCountries: data?.free_shipping_for_all_countries,
+      freeShippingCountriesIds: data?.free_shipping_countries_ids || [],
+      shippingFeeMethod: data?.shipping_fee_method,
     },
   });
 
@@ -244,6 +283,17 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
     form.setValue("variant_specs", variantSpecs);
     form.setValue("questions", questions);
   }, [colors, form, sizes, keywords, productSpecs, variantSpecs, questions]);
+
+  // Countries Options
+  type CountryOption = {
+    label: string;
+    value: string;
+  };
+
+  const countryOption: CountryOption[] = countries.map((c) => ({
+    label: c.name,
+    value: c.id!,
+  }));
 
   // console.log("form sizes ---->", form.watch().sizes);
 
@@ -361,6 +411,11 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
     setKeywords(keywords.filter((_, i) => index !== i));
   };
 
+  const handleDeleteCountryFreeShipping = (index: number) => {
+    const currentValue = form.getValues().freeShippingCountriesIds;
+    const updatedValues = currentValue.filter((_, i) => i !== index);
+    form.setValue("freeShippingCountriesIds", updatedValues);
+  };
   return (
     <AlertDialog>
       <Card className="w-full">
@@ -439,164 +494,137 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
               </div>
 
               {/* Name  */}
-              <div className="flex flex-col lg:flex-row gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Product Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Product Name"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {/* Variant  */}
-                <FormField
-                  control={form.control}
-                  name="variantName"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Variant Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Variant Name"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <InputFieldSet label="Name">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Product Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Product Name"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {/* Variant  */}
+                  <FormField
+                    control={form.control}
+                    name="variantName"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Variant Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Variant Name"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </InputFieldSet>
 
               {/* Product and variant description editor tabes */}
-              <Tabs defaultValue="product" className="w-full">
-                <TabsList className="w-full gird grid-cols-2 h-11">
-                  <TabsTrigger
-                    value="product"
-                    className="dark:bg-gray-900 dark:text-white"
-                  >
-                    Product description
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="variant"
-                    className="dark:bg-gray-900 dark:text-white"
-                  >
-                    Variant description
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="product">
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <JoditEditor
-                            ref={productDecEditor}
-                            value={form.getValues().description}
-                            onChange={(content) => {
-                              form.setValue("description", content);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </TabsContent>
-                <TabsContent value="variant">
-                  <FormField
-                    control={form.control}
-                    name="variantDescription"
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <JoditEditor
-                            ref={variantDecEditor}
-                            value={form.getValues().variantDescription}
-                            onChange={(content) => {
-                              form.setValue("variantDescription", content);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </TabsContent>
-              </Tabs>
+              <InputFieldSet
+                description="Note: The product description is the main description for the product (Will display in every variant page). You can add an extra description specific to this variant using Variant description tab."
+                label="Description"
+              >
+                <Tabs defaultValue="product" className="w-full">
+                  <TabsList className="w-full gird grid-cols-2 h-11">
+                    <TabsTrigger
+                      value="product"
+                      className="dark:bg-gray-900 dark:text-white"
+                    >
+                      Product description
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="variant"
+                      className="dark:bg-gray-900 dark:text-white"
+                    >
+                      Variant description
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="product">
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <JoditEditor
+                              config={config}
+                              ref={productDecEditor}
+                              value={form.getValues().description}
+                              onChange={(content) => {
+                                form.setValue("description", content);
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </TabsContent>
+                  <TabsContent value="variant">
+                    <FormField
+                      control={form.control}
+                      name="variantDescription"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <JoditEditor
+                              config={config}
+                              ref={variantDecEditor}
+                              value={form.getValues().variantDescription}
+                              onChange={(content) => {
+                                form.setValue("variantDescription", content);
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </InputFieldSet>
 
               {/* Category - Sub Category */}
-              <div className="flex flex-col lg:flex-row gap-4">
-                <FormField
-                  control={form.control}
-                  name="categoryId"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Select Category</FormLabel>
-                      <Select
-                        defaultValue={field.value}
-                        value={field.value}
-                        disabled={isLoading || categories?.length === 0}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select a Category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectLabel>Category</SelectLabel>
-                            {categories?.map((category, index) => (
-                              <SelectItem value={category.id} key={index}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {form.watch("categoryId") && (
+              <InputFieldSet label="Category">
+                <div className="flex flex-col lg:flex-row gap-4">
                   <FormField
                     control={form.control}
-                    name="subCategoryId"
+                    name="categoryId"
                     render={({ field }) => (
                       <FormItem className="flex-1">
-                        <FormLabel>Select Sub Category</FormLabel>
-
+                        <FormLabel>Select Category</FormLabel>
                         <Select
+                          defaultValue={field.value}
                           value={field.value}
+                          disabled={isLoading || categories?.length === 0}
                           onValueChange={field.onChange}
-                          disabled={isLoading || subCategories.length === 0}
                         >
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select a Sub Category" />
+                            <SelectValue placeholder="Select a Category" />
                           </SelectTrigger>
-
                           <SelectContent>
                             <SelectGroup>
-                              <SelectLabel>Sub Category</SelectLabel>
-
-                              {subCategories.map((subCategory) => (
-                                <SelectItem
-                                  key={subCategory.id}
-                                  value={subCategory.id}
-                                >
-                                  {subCategory.name}
+                              <SelectLabel>Category</SelectLabel>
+                              {categories?.map((category, index) => (
+                                <SelectItem value={category.id} key={index}>
+                                  {category.name}
                                 </SelectItem>
                               ))}
                             </SelectGroup>
@@ -607,70 +635,110 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                       </FormItem>
                     )}
                   />
-                )}
-              </div>
+                  {form.watch("categoryId") && (
+                    <FormField
+                      control={form.control}
+                      name="subCategoryId"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Select Sub Category</FormLabel>
+
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={isLoading || subCategories.length === 0}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select a Sub Category" />
+                            </SelectTrigger>
+
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Sub Category</SelectLabel>
+
+                                {subCategories.map((subCategory) => (
+                                  <SelectItem
+                                    key={subCategory.id}
+                                    value={subCategory.id}
+                                  >
+                                    {subCategory.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              </InputFieldSet>
 
               {/* Brand,SKU */}
-              <div className="flex flex-col lg:flex-row gap-4">
-                <FormField
-                  control={form.control}
-                  name="brand"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Brand</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Brand"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="sku"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Product sku</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="sku"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <InputFieldSet label="Brand, Product SKU, Weight">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  <FormField
+                    control={form.control}
+                    name="brand"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Brand</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Brand"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="sku"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Product sku</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="sku"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="weight"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Weight</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="Weight"
-                          {...field}
-                          value={field.value ?? 0}
-                          onChange={(value) => {
-                            field.onChange(Number(value.target.value));
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                  <FormField
+                    control={form.control}
+                    name="weight"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Weight</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Weight"
+                            {...field}
+                            value={field.value ?? 0}
+                            onChange={(value) => {
+                              field.onChange(Number(value.target.value));
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </InputFieldSet>
 
               <div className="flex items-center gap-10 py-14">
                 {/* Variant image - */}
@@ -840,52 +908,193 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
               </div>
 
               {/* Is On Sale */}
-              <div className="flex border rounded-md">
-                <FormField
-                  control={form.control}
-                  name="isSale"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 p-4">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>On Sale</FormLabel>
-                        <FormDescription>
-                          Is this product on sale?
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
 
-                {form.getValues().isSale && (
+              <InputFieldSet
+                label="Sale"
+                description="Is your product on sale?"
+              >
+                <label
+                  htmlFor="yes"
+                  className="ml-5 flex items-center gap-x-2 cursor-pointer"
+                >
+                  <div className="flex border rounded-md">
+                    <FormField
+                      control={form.control}
+                      name="isSale"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>On Sale</FormLabel>
+                            <FormDescription>
+                              Is this product on sale?
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    {form.getValues().isSale && (
+                      <FormField
+                        control={form.control}
+                        name="saleEndDate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 p-4">
+                            <FormControl>
+                              <DateTimePicker
+                                className="inline-flex items-center gap-2 p-2 border rounded-md shadow-sm w-100"
+                                format="yyyy-MM-dd HH:mm"
+                                calendarIcon={
+                                  <span className="text-gray-50 hover:text-gray-600">
+                                    📅
+                                  </span>
+                                }
+                                clearIcon={
+                                  <span className=" text-red-500 text-2xl hover:text-red-600">
+                                    x
+                                  </span>
+                                }
+                                onChange={(date) => {
+                                  field.onChange(
+                                    date
+                                      ? format(date, "yyyy-MM-dd'T'HH:mm:ss")
+                                      : "",
+                                  );
+                                }}
+                                value={
+                                  field.value ? new Date(field.value) : null
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+                </label>
+              </InputFieldSet>
+
+              {/* Shipping fee method */}
+              <InputFieldSet label="Product shipping fee method">
+                <div className="">
                   <FormField
                     control={form.control}
-                    name="saleEndDate"
+                    name="shippingFeeMethod"
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-start space-x-3 p-4">
                         <FormControl>
-                          <DateTimePicker
-                            format="yyyy-MM-dd"
-                            onChange={(date) => {
-                              field.onChange(
-                                date
-                                  ? format(date, "yyyy-MM-dd'T'HH:mm:ss")
-                                  : "",
-                              );
-                            }}
-                            value={field.value ? new Date(field.value) : null}
-                          />
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select Shipping Fee Calculation method" />
+                            </SelectTrigger>
+
+                            <SelectContent>
+                              <SelectGroup>
+                                {ShippingFeeMethods.map((method, i) => (
+                                  <SelectItem key={i} value={method.value}>
+                                    {method.description}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
                         </FormControl>
                       </FormItem>
                     )}
                   />
+                </div>
+              </InputFieldSet>
+
+              {/* Fee Shipping */}
+              <InputFieldSet
+                label="Free Shipping (Optional)"
+                description="Free Shipping Worldwide?"
+              >
+                <label
+                  htmlFor="freeShippingForAll"
+                  className="ml-5 flex items-center gap-x-2 cursor-pointer"
+                >
+                  <FormField
+                    control={form.control}
+                    name="freeShippingForAllCountries"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Yes</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </label>
+                <p className="flex justify-start text-gray-400 text-sm">
+                  <Dot />
+                  If not select the countries you want to ship this product to
+                  for free
+                </p>
+
+                {!form.getValues().freeShippingForAllCountries && (
+                  <div className="mt-5">
+                    <FormField
+                      control={form.control}
+                      name="freeShippingCountriesIds"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 p-4">
+                          <FormControl>
+                            <MultiSelect
+                              className="w-200!"
+                              options={countryOption}
+                              value={field.value}
+                              labelledBy={"Select"}
+                              onChange={(selected: CountryOption[]) => {
+                                field.onChange(selected);
+                              }}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 )}
-              </div>
+                <p className="text-sm text-gray-400 pb-3 flex">
+                  <Dot className="-me-1" />
+                  List of countries you offer free shipping for this product :
+                  &nbsp;
+                  {form.getValues().freeShippingCountriesIds &&
+                    form.getValues().freeShippingCountriesIds.length === 0 &&
+                    "None"}
+                </p>
+                {/* Free shipping countries*/}
+                <div className="flex flex-wrap gap-1">
+                  {form.watch().freeShippingCountriesIds?.map((country, i) => (
+                    <div
+                      key={i}
+                      className="text-xs inline-flex items-center px-3 py-1 bg-blue-200 text-blue-600 rounded-md"
+                    >
+                      <span> {country.label}</span>
+                      <span
+                        onClick={() => handleDeleteCountryFreeShipping(i)}
+                        className="cursor-pointer hover:text-red-500 ml-2"
+                      >
+                        x
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </InputFieldSet>
 
               <Button
                 type="submit"

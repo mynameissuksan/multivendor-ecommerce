@@ -16,7 +16,7 @@ export interface ProductModelInput {
   name: string;
   description?: string;
 
-  shipping_fee_method?: string;
+  shipping_fee_method?: SHIPPING_FEE_MOETHOD;
   slug?: string;
   brand: string;
   rating?: number;
@@ -24,6 +24,14 @@ export interface ProductModelInput {
   created_at?: string;
   updated_at?: string;
   reivews?: ReviewModelInput[];
+  free_shipping_for_all_countries?: boolean;
+  free_shipping_countries_ids?: { id: string; label: string; value: string }[];
+}
+
+export enum SHIPPING_FEE_MOETHOD {
+  ITEM = "ITEM",
+  WEIGHT = "WEIGHT",
+  FIXED = "FIXED",
 }
 
 export interface ProductVariantModelInput {

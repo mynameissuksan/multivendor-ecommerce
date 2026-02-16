@@ -1,4 +1,6 @@
 import COUNTRIES from "@/data/countries.json";
+import {
+} from "@/models/product-model";
 import { getProductPageData, getRatingStatistics } from "@/queries/product";
 
 export interface DashboardSidebarMenuInterface {
@@ -52,3 +54,24 @@ export type ReviewFilterType = {
 export type ReviewOrderType = {
   orderBy: "latest" | "oldest" | "highest";
 };
+
+export type ReviewDetailsType = {
+  id?: string;
+  review: string;
+  rating: number;
+  images: { url: string }[];
+  size: string;
+  quantity: number;
+  variant: string;
+  color: string;
+};
+
+// export type VariantInfoType = {
+//   variantName: string;
+//   variantSlug: string;
+//   variantImage: string;
+//   variantUrl: string;
+//   images: ProductVariantImagesModelInput[];
+//   sizes: ProductSizeModelInput[];
+//   colors: Partial<ProductColorsModelInput>[];
+// };

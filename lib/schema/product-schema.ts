@@ -1,3 +1,4 @@
+import { SHIPPING_FEE_MOETHOD } from "@/models/product-model";
 import * as z from "zod";
 
 // Product schema
@@ -145,4 +146,19 @@ export const ProductFormSchema = z.object({
       }),
     )
     .optional(),
+  freeShippingForAllCountries: z.boolean().default(false),
+  freeShippingCountriesIds: z
+    .object({
+      id: z.string().optional(),
+      label: z.string(),
+      value: z.string(),
+    })
+    .array()
+    .optional()
+    .refine(
+      (ids) => ids?.every((item) => item.label && item.value),
+      "Each country must have a valid name and ID.",
+    )
+    .default([]),
+  shippingFeeMethod: z.enum(SHIPPING_FEE_MOETHOD),
 });

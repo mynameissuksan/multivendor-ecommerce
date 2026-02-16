@@ -569,7 +569,7 @@ async function queryReviewsProduct(productId: string) {
      LEFT JOIN review_images ri ON ri.review_id = r.id
      INNER JOIN users u ON r.user_id = u.id
      WHERE r.product_id = ?
-     LIMIT 2`,
+     LIMIT 4`,
     [productId],
   );
 
@@ -602,7 +602,7 @@ async function queryReviewsProduct(productId: string) {
     const filterId = rows.find((f) => f.ri_review_id === getMapId);
 
     if (filterId) {
-      dataMap.get(review.review_id)?.review_image.push({
+      dataMap.get(review.review_id)?.review_image?.push({
         id: review.ri_review_id,
         url: review.image_url,
         alt: review.image_review_alt,
@@ -1067,10 +1067,11 @@ export const retrieveProductDetails = async (productSlug: string) => {
     queryVariantColors(variantIds),
     // prodcut sizes
     queryVariantSizes(variantIds),
-    //  product specs
+    // fetch product variant specifications
     queryVariantSpecs(variantIds[0]),
     // product qestion
     queryQuestions([productId]),
+    // fetch product specifications
     queryProductSpecs(productId),
     // Fetch store followers
     queryFollowStoreCountByStoreId(rows[0].store_id),
@@ -1349,10 +1350,15 @@ export const getProductFilteredReviews = async (
   filters: { rating?: number; hasImages?: boolean },
   sort: { orderBy: "latest" | "oldest" | "highest" } | undefined,
   page: number = 1,
-  pageSize: number = 2,
+  pageSize: number = 4,
 ) => {
   const where: string[] = [];
   const params: any[] = [];
+
+  let orderBySql = "ORDER BY r.rating DESC"; // default highest
+
+  // console.log("sort ----> ", sort);
+  // console.log("filters ----> ", filters);
 
   // base filter
   where.push("r.product_id = ?");
@@ -1364,7 +1370,7 @@ export const getProductFilteredReviews = async (
     const rating = Number(filters.rating);
     // rating+0.5 = 4 or 4.5
     where.push("r.rating IN (?, ?)");
-    params.push(rating, rating + 0.5);
+    params.push(rating, rating < 5 ? rating + 0.5 : rating);
   }
 
   // hasImages filter มีอย่างน้อย 1 รูป
@@ -1377,16 +1383,18 @@ export const getProductFilteredReviews = async (
   }
 
   // sorting
-  // let orderBySql = "r.created_at DESC";
-  // if (sort?.orderBy === "oldest") {
-  //   console.log("--------------- oldest ---------------");
 
-  //   orderBySql = "r.created_at ASC";
-  // }
-  // if (sort?.orderBy === "highest") {
-  //   console.log("--------------- highest ---------------");
-  //   orderBySql = "r.rating DESC, r.created_at DESC";
-  // }
+  if (sort?.orderBy === "latest") {
+    orderBySql = "ORDER BY r.created_at DESC";
+  }
+
+  if (sort?.orderBy === "oldest") {
+    orderBySql = "ORDER BY r.created_at ASC";
+  }
+
+  if (sort?.orderBy === "highest") {
+    orderBySql = "ORDER BY r.rating DESC";
+  }
 
   const offset = (page - 1) * pageSize;
   const limit = pageSize;
@@ -1414,14 +1422,18 @@ export const getProductFilteredReviews = async (
               ri.id as review_image_id
 
               FROM reviews r
-              INNER JOIN users u ON u.id = r.user_id
+              LEFT JOIN users u ON u.id = r.user_id
               LEFT JOIN review_images ri ON ri.review_id = r.id
               ${whereSql}
-              ORDER BY r.created_at DESC
+              ${orderBySql}
               LIMIT ? OFFSET ?
             `;
 
+  // console.log('sql ',sql)
+
   params.push(limit, offset);
+
+  // console.log('params -- > ',params)
 
   const [rows] = await pool.query<RowDataPacket[]>(sql, params);
 
@@ -1448,9 +1460,12 @@ export const getProductFilteredReviews = async (
         review_image: [],
       });
     }
+    const findReviewId = rows.find(
+      (f) => f.review_id === row.review_image_review_id,
+    );
 
-    if (row.review_image_id) {
-      dataMap.get(row.review_id)?.review_image.push({
+    if (findReviewId) {
+      dataMap.get(row.review_id)?.review_image?.push({
         id: row.review_image_id as string,
         url: row.review_image_url as string,
         alt: row.review_image_alt as string,

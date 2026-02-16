@@ -3,11 +3,11 @@ import React from "react";
 import { Rating } from "react-simple-star-rating";
 
 const ProductRatingCard = ({ rating }: { rating: number }) => {
-  const fixed_rating = Number(rating.toFixed(2));
+  const fixed_rating = Number(rating.toFixed(1));
   return (
     <div className="h-44 flex-1">
       <div className="p-6 bg-[#f5f5f5] flex flex-col h-full justify-center overflow-hidden rounded-lg">
-        <div className="text-6xl font-bold">{fixed_rating ?? ""}</div>
+        <div className="text-6xl font-bold">{fixed_rating || 0.0}</div>
         <div className="py-1.5">
           <Rating
             className=""
