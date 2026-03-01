@@ -25,7 +25,7 @@ export interface ProductModelInput {
   updated_at?: string;
   reivews?: ReviewModelInput[];
   free_shipping_for_all_countries?: boolean;
-  free_shipping_countries_ids?: { id: string; label: string; value: string }[];
+  free_shipping_countries_ids?: { id?: string; label: string; value: string }[];
 }
 
 export enum SHIPPING_FEE_MOETHOD {

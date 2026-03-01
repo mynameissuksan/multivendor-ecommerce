@@ -1,9 +1,11 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { useCartStore } from "@/cart-store/useCartStore";
+import useFromStore from "@/hooks/useFromStore";
 import { CartProductType } from "@/lib/types";
 import { ProductSizeModelInput } from "@/models/product-model";
 import { Minus, Plus } from "lucide-react";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 
 interface Props {
   productId: string;
@@ -24,16 +26,32 @@ const QuantitySelector: React.FC<Props> = ({
   handleChange,
   stock,
 }) => {
-  // If no sizeId is provided, return null to prevent redering the component
+  // Get cart product if it exists in cart , the get added quantity
+  const cart = useFromStore(useCartStore, (state) => state.cart);
 
   useEffect(() => {
     handleChange("quantity", 1);
   }, [handleChange, sizeId]);
 
+  const maxQty = useMemo(() => {
+    const search_product = cart?.find(
+      (p) =>
+        p.productId === productId &&
+        p.variantId === variantId &&
+        p.sizeId === sizeId,
+    );
+    return search_product
+      ? search_product.stock - search_product.quantity
+      : stock;
+  }, [cart, productId, variantId, sizeId, stock]);
+
+  // console.log("maxQty", maxQty);
+
+  // If no sizeId is provided, return null to prevent redering the component
   if (!sizeId) return null;
 
   const handleIncrease = () => {
-    if (quantity < stock) {
+    if (quantity < maxQty) {
       handleChange("quantity", quantity + 1);
     }
   };
@@ -49,11 +67,16 @@ const QuantitySelector: React.FC<Props> = ({
       <div className="w-full flex justify-between items-center gap-x-5">
         <div className="grow">
           <span className="block text-xs text-gray-500">Select quantity</span>
+          <span className="block text-xs text-gray-500">
+            {maxQty !== stock &&
+              `(You already have ${stock - maxQty} pieces of this product in cart)`}
+          </span>
           <input
             type="number"
             className="w-full p-0 bg-transparent border-0 focus:outline-0 text-gray-800"
             min={1}
-            value={quantity}
+            max={maxQty}
+            value={maxQty <= 0 ? 0 : quantity}
             readOnly
           />
         </div>

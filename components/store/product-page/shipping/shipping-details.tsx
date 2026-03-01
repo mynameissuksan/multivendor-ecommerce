@@ -93,7 +93,7 @@ const ShippingDetails: React.FC<Props> = ({
           <ProductShippingFee
             fee={shippingDetail!.shippingFee}
             extraFee={shippingDetail!.extraShippingFee}
-            quantity={2}
+            quantity={1}
             method={shippingDetail!.shippingFeeMethod}
             weight={weight}
           />

@@ -97,10 +97,12 @@ export const upsertProduct = async (
     //   [product.id]
     // );
 
+    console.log('seller = ',user.id)
+
     // find the store by url
     const [storeRows] = await conn.query<StoreModel[]>(
-      "SELECT * FROM stores WHERE url = ?",
-      [storeUrl],
+      "SELECT * FROM stores WHERE url = ? AND user_id = ?",
+      [storeUrl, user.id],
     );
 
     if (storeRows.length === 0) throw new Error("Store not found");

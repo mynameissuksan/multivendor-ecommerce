@@ -70,6 +70,7 @@ import { Country } from "@/models/country-model";
 
 import { MultiSelect } from "react-multi-select-component";
 import { useTheme } from "next-themes";
+import { Separator } from "@radix-ui/react-separator";
 
 const ShippingFeeMethods = [
   {
@@ -351,6 +352,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
             question: q.question ?? "",
             answer: q.answer ?? "",
           })),
+          shipping_fee_method: values.shippingFeeMethod,
+          free_shipping_countries_ids: values.freeShippingCountriesIds || [],
           product_varian: [
             {
               id: data?.product_varian[0]!.id,

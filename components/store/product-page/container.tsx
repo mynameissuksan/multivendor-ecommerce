@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/rules-of-hooks */
 import { CartProductType, ProductPageDataType } from "@/lib/types";
-import { ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import ProductSwiper from "./product-info/product-swiper";
 import ProductInfo from "./product-info/product-info";
 import ShipTo from "./shipping/ship-to";
@@ -12,6 +12,9 @@ import ReturnsPrivacySecurityCard from "./shipping/returns-security-privacy-card
 import { cn, isProductValidToCart } from "@/lib/utils";
 import QuantitySelector from "./product-info/quantity-selector";
 import SocialShare from "../store-shared/social-share";
+import { useCartStore } from "@/cart-store/useCartStore";
+import { toast } from "sonner";
+import useFromStore from "@/hooks/useFromStore";
 
 interface Props {
   productData: ProductPageDataType;
@@ -99,6 +102,32 @@ const ProductPageContainer: React.FC<Props> = ({
   //   productToBeAddedToCart.quantity,
   // );
 
+  // get the store action to add items to cart
+  const addToCart = useCartStore((state) => state.addToCart);
+
+  const cartItems = useFromStore(useCartStore, (state) => state.cart);
+
+  console.log("cartItem ", cartItems);
+
+  const handleAddToCart = () => {
+    if (maxQty <= 0) return;
+
+    addToCart(productToBeAddedToCart);
+    toast.success("Product added to cart!");
+  };
+
+  const maxQty = useMemo(() => {
+    const search_product = cartItems?.find(
+      (p) =>
+        p.productId === product.id &&
+        p.variantId === variant.id &&
+        p.sizeId === sizeId,
+    );
+    return search_product
+      ? search_product.stock - search_product.quantity
+      : productToBeAddedToCart.stock;
+  }, [cartItems, productToBeAddedToCart.stock, product.id, variant.id, sizeId]);
+
   return (
     <div className="relative">
       <div className="w-full xl:flex xl:gap-4">
@@ -164,10 +193,11 @@ const ProductPageContainer: React.FC<Props> = ({
                     <span>Buy now</span>
                   </button>
                   <button
+                    onClick={() => handleAddToCart()}
                     className={cn(
                       "relative w-full py-2.5 min-w-20 bg-orange-300 text-white hover:bg-orange-200 h-11 rounded-3xl leading-6 inline-block font-bold whitespace-normal border border-white cursor-pointer transition-all duration-300 ease-in select-none",
                       {
-                        "cursor-not-allowed ": !isProductValid,
+                        "cursor-not-allowed ": !isProductValid || maxQty <= 0,
                       },
                     )}
                   >
