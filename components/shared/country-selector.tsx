@@ -67,7 +67,7 @@ export default function CountrySelector({
               src={`https://purecatamphetamine.github.io/country-flag-icons/3x2/${selectedValue.code}.svg`}
               className={"inline mr-2 h-4 rounded-sm"}
             />
-            {selectedValue.code}
+            {selectedValue.name}
           </span>
           <span
             className={`absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none ${
@@ -123,14 +123,14 @@ export default function CountrySelector({
                 }
               >
                 {COUNTRIES.filter((country) =>
-                  country.code.toLowerCase().startsWith(query.toLowerCase())
+                  country.code.toLowerCase().startsWith(query.toLowerCase()),
                 ).length === 0 ? (
                   <li className="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9">
                     No countries found
                   </li>
                 ) : (
                   COUNTRIES.filter((country) =>
-                    country.code.toLowerCase().startsWith(query.toLowerCase())
+                    country.code.toLowerCase().startsWith(query.toLowerCase()),
                   ).map((value, index) => {
                     return (
                       <li
@@ -139,7 +139,7 @@ export default function CountrySelector({
                         id="listbox-option-0"
                         role="option"
                         onClick={() => {
-                          onChange(value.code);
+                          onChange(value.name);
                           setQuery("");
                           onToggle();
                         }}
@@ -153,7 +153,7 @@ export default function CountrySelector({
                         <span className="font-normal truncate">
                           {value.name}
                         </span>
-                        {value.code === selectedValue.code ? (
+                        {value.name === selectedValue.name ? (
                           <span className="text-blue-600 absolute inset-y-0 right-0 flex items-center pr-8">
                             <svg
                               className="h-5 w-5"

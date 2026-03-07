@@ -28,7 +28,7 @@ export interface FreeShippingModel {
   updated_at?: string;
 }
 
-interface FreeShippingCountry {
+export interface FreeShippingCountry {
   id: string;
   country_id: string;
   free_shipping_id: string;

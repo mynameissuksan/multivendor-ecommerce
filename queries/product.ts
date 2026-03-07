@@ -97,7 +97,7 @@ export const upsertProduct = async (
     //   [product.id]
     // );
 
-    console.log('seller = ',user.id)
+    console.log("seller = ", user.id);
 
     // find the store by url
     const [storeRows] = await conn.query<StoreModel[]>(
@@ -1195,7 +1195,7 @@ export const getShippingDetails = async (
       shipping?.delivery_time_max || store.default_delivery_time_max;
 
     // check for free shipping
-    if (freeShipping) {
+    if (freeShipping?.free_shipping_country!.length > 0) {
       const freeShippingCountries = freeShipping.free_shipping_country;
       const checkFreeShipping = freeShippingCountries?.find(
         (c) => c.country_id === country[0].id,
