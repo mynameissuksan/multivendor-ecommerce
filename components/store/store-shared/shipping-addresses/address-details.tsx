@@ -114,15 +114,12 @@ const AddressDetails: React.FC<AddressDetailssProps> = ({
   const handleCountryChange = (name: string) => {
     const country = countries.find((c) => c.name === name);
 
-    console.log("country = ", name);
-
     if (country) {
       form.setValue("countryId", country.id!);
     }
     setCountry(name);
   };
 
-  console.log("form = ", form.watch().countryId);
   return (
     <div>
       <Form {...form}>

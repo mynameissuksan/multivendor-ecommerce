@@ -14,6 +14,8 @@ import {
   FreeShippingModel,
 } from "@/models/shipping-model";
 import { ShippingAddressModel } from "@/models/shipping-address";
+import { Country } from "@/models/country-model";
+import { CartModel } from "@/models/cart-model";
 
 export const followStore = async (storeId: string) => {
   try {
@@ -206,7 +208,6 @@ export const saveUserCart = async (
             Number(details.shippingFee) *
             Number(data["weight"]) *
             Number(quantity);
-          console.log("weight ====", data["weight"]);
         } else if (shippingFeeMethod === "FIXED") {
           shippingFee = details.shippingFee;
         }
@@ -243,12 +244,12 @@ export const saveUserCart = async (
       0,
     );
 
-    const total = subTotal + shippingFees;
+    const total = Number(subTotal) + Number(shippingFees);
 
     // save the validated items to the cart in the db
     await pool.query<ResultSetHeader>(
       "INSERT INTO carts (user_id, shipping_fees, sub_total, total) VALUES (?, ?, ?, ?)",
-      [userId, shippingFees, subTotal, total],
+      [userId, shippingFees, Number(subTotal), total],
     );
 
     const [cartId] = await pool.query<RowDataPacket[]>(
@@ -300,12 +301,18 @@ export const getUserShippingAddresses = async () => {
     if (!user) throw new Error("Unautorized");
 
     const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT pa.*, c.* FROM shipping_address pa INNER JOIN countries c ON pa.country_id = c.id WHERE user_id = ?",
+      `SELECT 
+       pa.id as ship_adr_id,
+       pa.*,
+       c.*
+       FROM shipping_address pa 
+       INNER JOIN countries c ON pa.country_id = c.id 
+       WHERE user_id = ?`,
       [user.id],
     );
 
     const shipping: ShippingAddressModel[] = rows.map((item) => ({
-      id: item.id,
+      id: item.ship_adr_id,
       first_name: item.first_name,
       last_name: item.last_name,
 
@@ -324,8 +331,6 @@ export const getUserShippingAddresses = async () => {
       addr_default: item.addr_default,
     }));
 
-    console.log(shipping)
-
     return shipping;
   } catch (error) {
     throw error;
@@ -342,7 +347,7 @@ export const upsertShippingAddresss = async (address: ShippingAddressModel) => {
 
     if (address.addr_default) {
       const [addressRows] = await pool.query<RowDataPacket[]>(
-        "SELECT * FROM shipping_address WHERE id = ? LIMIT 1",
+        "SELECT id FROM shipping_address WHERE id = ? LIMIT 1",
         [address.id],
       );
 
@@ -353,8 +358,8 @@ export const upsertShippingAddresss = async (address: ShippingAddressModel) => {
              SET 
              updated_at = NOW(),
              addr_default = 0
-             WHERE id = ? AND addr_default = 1`,
-            [address.id],
+             WHERE user_id = ? AND addr_default = 1`,
+            [address.user_id],
           );
         } catch (error) {
           throw error;
@@ -374,9 +379,10 @@ export const upsertShippingAddresss = async (address: ShippingAddressModel) => {
              state = ?, 
              city = ?, 
              zip_code = ?, 
-             country_id = ?, 
-             updated_at = NOW()
-             WHERE id = ? AND addr_default = 1`,
+             country_id = ?,
+             updated_at = NOW(),
+             addr_default = ?
+             WHERE id = ?`,
         [
           address.first_name,
           address.last_name,
@@ -387,6 +393,7 @@ export const upsertShippingAddresss = async (address: ShippingAddressModel) => {
           address.city,
           address.zip_code,
           address.country_id,
+          address.addr_default,
           address.id,
         ],
       );
@@ -426,4 +433,188 @@ export const upsertShippingAddresss = async (address: ShippingAddressModel) => {
   } catch (error) {
     throw error;
   }
+};
+
+export const placeOrder = async (
+  shippingAddress: ShippingAddressModel,
+  cartId: string,
+) => {
+  const user = await currentUser();
+
+  if (!user) throw new Error("Unautorized.");
+
+  const [cartRows] = await pool.query<RowDataPacket[]>(
+    `SELECT * FROM carts WHERE id = ?`,
+    [cartId],
+  );
+
+  const cart = cartRows as CartModel[];
+
+  if (cartRows.length === 0) throw new Error("Cart not found");
+
+  // fetch product, variant and size data from the db for validation
+  const validatedCartItems = await Promise.all(
+    cart.map(async (cartProduct) => {
+      const { product_id, variant_id, size_id, quantity } = cartProduct;
+
+      // fetch the product, variant size from the db
+      const [rows] = await pool.query<RowDataPacket[]>(
+        `
+        SELECT
+          p.id  AS product_id,
+          p.slug AS product_slug,
+          p.name AS product_name,
+          p.shipping_fee_method AS shipping_fee_method,
+
+          s.id  AS store_id,
+          s.return_policy,
+          s.default_shipping_service,
+          s.default_shipping_fee_per_kg,
+          s.default_shipping_fee_per_item,
+          s.default_shipping_fee_for_addional_item,
+          s.default_shipping_fee_fixed,
+          s.default_delivery_time_min,
+          s.default_delivery_time_max,
+
+          v.id  AS variant_id,
+          v.slug AS variant_slug,
+          v.sku AS sku,
+          v.name AS variant_name,
+          v.weight AS weight,
+
+          z.id  AS size_id,
+          z.quantity AS quantity,
+          z.discount AS discount,
+          z.price AS price,
+          z.size AS size,
+
+          i.id  AS image_id,
+          i.url AS image_url,
+          
+          fs.id AS free_shipping_id
+          
+        FROM products p
+        INNER JOIN stores s ON s.id = p.store_id
+        INNER JOIN products_variant v ON v.product_id = p.id AND v.id = ?
+        LEFT JOIN sizes z ON z.products_variant_id = v.id
+        LEFT JOIN product_variant_images i ON i.products_variant_id = v.id
+        LEFT JOIN free_shippings fs ON fs.product_id = p.id
+        WHERE p.id = ?
+  `,
+        [variant_id, product_id],
+      );
+
+      const data = rows[0];
+
+      const [freeShippingRow] = await pool.query<RowDataPacket[]>(
+        "SELECT * FROM free_shipping_countries WHERE free_shipping_id = ?",
+        [data["free_shipping_id"]],
+      );
+
+      const storesMap = {
+        id: data["store_id"],
+        return_policy: data["return_policy"],
+        default_shipping_service: data["default_shipping_service"],
+        default_shipping_fee_per_kg: data["default_shipping_fee_per_kg"],
+        default_shipping_fee_per_item: data["default_shipping_fee_per_item"],
+        default_shipping_fee_for_addional_item:
+          data["default_shipping_fee_for_addional_item"],
+        default_shipping_fee_fixed: data["default_shipping_fee_fixed"],
+        default_delivery_time_min: data["default_delivery_time_min"],
+        default_delivery_time_max: data["default_delivery_time_max"],
+      } as StoreModelInput;
+
+      const freeShipppingMap = {
+        free_shipping_country: freeShippingRow as FreeShippingCountry[],
+      } as FreeShippingModel;
+
+      if (rows.length === 0 || data["size_id"] === null) {
+        throw new Error(
+          `Invalid product, variant, or size combiation for product id ${product_id}, variant id ${variant_id} size id ${size_id}`,
+        );
+      }
+
+      // Validate stock and price
+      const validQty = Math.min(quantity, data["quantity"]);
+
+      const price = data["discount"]
+        ? Number(data["price"]) -
+          Number(data["price"]) * (Number(data["discount"]) / 100)
+        : Number(data["price"]);
+
+      // calculate shipping details
+      const countryId = shippingAddress.country_id;
+
+      const [temp_country] = await pool.query<RowDataPacket[]>(
+        "SELECT id FROM countries WHERE id = ? LIMIT 1",
+        [countryId],
+      );
+
+      if (temp_country.length === 0)
+        throw new Error("Failded  to get shipping details for order");
+
+      let details = {
+        shippingFee: 0,
+        extraShippingFee: 0,
+        isFreeShipping: false,
+      };
+
+      const country = {
+        name: temp_country[0].name,
+        code: temp_country[0].code,
+        city: "",
+      };
+
+      if (country) {
+        const temp_details = await getShippingDetails(
+          data["shipping_fee_method"],
+          country,
+          storesMap,
+          freeShipppingMap,
+        );
+
+        if (typeof temp_details !== "boolean") {
+          details = temp_details;
+        }
+      }
+
+      let shippingFee = 0;
+      const shippingFeeMethod = data["shipping_fee_method"];
+      if (shippingFeeMethod === "ITEM") {
+        shippingFee =
+          quantity === 1
+            ? details.shippingFee
+            : Number(details.shippingFee) +
+              Number(details.extraShippingFee) * Number(quantity - 1);
+      } else if (shippingFeeMethod === "WEIGHT") {
+        shippingFee =
+          Number(details.shippingFee) *
+          Number(data["weight"]) *
+          Number(quantity);
+      } else if (shippingFeeMethod === "FIXED") {
+        shippingFee = details.shippingFee;
+      }
+
+      const totalPrice = price * validQty + shippingFee;
+
+      return {
+        productId: product_id,
+        variantId: variant_id,
+        productSlug: data["product_slug"],
+        variantSlug: data["variant_slug"],
+        sizeId: size_id,
+        storeId: data["store_id"],
+        sku: data["sku"],
+        name: `${data["product_name"]} - ${data["variant_name"]}`,
+        images: data["image_url"],
+        size: data["size"],
+        quantity: validQty,
+        price,
+        shippingFee,
+        totalPrice,
+      };
+    }),
+  );
+
+  console.log("validate", validatedCartItems);
 };

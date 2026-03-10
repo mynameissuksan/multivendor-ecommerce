@@ -24,3 +24,7 @@ export interface CartModel extends RowDataPacket {
   cart_id: string;
   store_id: string;
 }
+
+interface CartItemModel {
+  id: string;
+}

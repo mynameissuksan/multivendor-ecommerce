@@ -39,7 +39,7 @@ const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 
   const setOpen = async (
     modal: React.ReactNode,
-    fetchData?: () => Promise<any>
+    fetchData?: () => Promise<any>,
   ) => {
     if (modal) {
       if (fetchData) {
@@ -74,3 +74,25 @@ export const useModal = () => {
 };
 
 export default ModalProvider;
+
+export function useOnClickOutside(ref: any, handler: any) {
+  useEffect(() => {
+    const handleClickOutside = (event: any) => {
+      // If the ref exists and the clicked element is not inside the target element, call the handler.
+      if (ref.current && !ref.current.contains(event.target)) {
+        handler();
+      }
+    };
+
+    // Add event listener for 'mousedown' or 'click' to the window/document
+    document.addEventListener("mousedown", handleClickOutside);
+    // Optional: Add 'touchend' listener for mobile compatibility
+    document.addEventListener("touchend", handleClickOutside);
+
+    // Clean up the event listener when the component unmounts or the ref/handler changes
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchend", handleClickOutside);
+    };
+  }, [ref, handler]); // Re-run effect if ref or handler changes
+}
