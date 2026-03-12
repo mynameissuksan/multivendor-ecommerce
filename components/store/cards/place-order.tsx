@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Button } from "@/components/ui/button";
 import { ShippingAddressModel } from "@/models/shipping-address";
 
@@ -13,6 +14,7 @@ import React from "react";
 import FastDelivery from "./fast-delivery";
 import { SecurityPrivacyCard } from "../product-page/shipping/returns-security-privacy-card";
 import { toast } from "sonner";
+import { placeOrder } from "@/queries/user";
 
 const PlaceOrderCard: React.FC<Props> = ({
   shippingAddress,
@@ -24,6 +26,13 @@ const PlaceOrderCard: React.FC<Props> = ({
   const handlePlaceOrder = async () => {
     if (!shippingAddress) {
       toast.error("Select a shipping address first!");
+    } else {
+      try {
+        const res = await placeOrder(shippingAddress, cartId);
+        // console.log('cartId = ',cartId)
+      } catch (error: any) {
+        toast.error("Something went wrong! ", error);
+      }
     }
   };
   return (

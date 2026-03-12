@@ -1,4 +1,4 @@
-import { CartModel } from "@/models/cart-model";
+import { CartItemModel } from "@/models/cart-model";
 import { ChevronRight, Truck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -6,7 +6,7 @@ import Link from "next/link";
 export default function CheckoutProductCard({
   product,
 }: {
-  product: CartModel;
+  product: CartItemModel;
 }) {
   const { product_slug, variant_slug, size_id, shipping_fee } = product;
   return (

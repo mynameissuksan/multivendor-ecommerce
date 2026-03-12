@@ -444,7 +444,10 @@ export const placeOrder = async (
   if (!user) throw new Error("Unautorized.");
 
   const [cartRows] = await pool.query<RowDataPacket[]>(
-    `SELECT * FROM carts WHERE id = ?`,
+    `SELECT carts.*, cart_items.*
+     FROM carts  
+     INNER JOIN cart_items ON carts.id = cart_items.cart_id
+     WHERE carts.id = ?`,
     [cartId],
   );
 

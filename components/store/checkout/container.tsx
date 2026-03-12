@@ -9,7 +9,7 @@ import CheckoutProductCard from "../cards/checkout-product";
 import PlaceOrderCard from "../cards/place-order";
 
 interface Props {
-  cart: CartModel[];
+  cart: CartModel;
   countries: Country[];
   addresses: ShippingAddressModel[];
 }
@@ -17,8 +17,6 @@ interface Props {
 const CheckoutContainer: React.FC<Props> = ({ cart, countries, addresses }) => {
   const [selectedAddress, setSelectedAddress] =
     useState<ShippingAddressModel | null>(null);
-
-  const cartItem = cart[0];
 
   return (
     <div className="flex">
@@ -33,7 +31,7 @@ const CheckoutContainer: React.FC<Props> = ({ cart, countries, addresses }) => {
         {/* Cart side */}
         <div className="w-full py-4 px-4 bg-white my-3">
           <div className="relative">
-            {cart.map((item, i) => (
+            {cart.cart_items.map((item, i) => (
               <CheckoutProductCard key={i} product={item} />
             ))}
           </div>
@@ -42,11 +40,11 @@ const CheckoutContainer: React.FC<Props> = ({ cart, countries, addresses }) => {
 
       {/* PlaceOrderCard */}
       <PlaceOrderCard
-        cartId={cartItem.id}
+        cartId={cart.id}
         shippingAddress={selectedAddress}
-        shippingFees={Number(cartItem.shipping_fees)}
-        subTotal={Number(cartItem.sub_total)}
-        total={Number(cartItem.total)}
+        shippingFees={Number(cart.shipping_fees)}
+        subTotal={Number(cart.sub_total)}
+        total={Number(cart.total)}
       />
     </div>
   );
