@@ -1168,6 +1168,8 @@ export const getShippingDetails = async (
     [userCountry.name, userCountry.code],
   );
 
+  // console.log("country = ", country, userCountry.name, userCountry.code);
+
   if (country.length !== 0) {
     // Retrieve shipping rate for the country
     const [shippingRate] = await pool.query<RowDataPacket[]>(
@@ -1479,4 +1481,47 @@ export const getProductFilteredReviews = async (
   const mapData = Array.from(dataMap.values());
 
   return mapData;
+};
+
+export const getDeliveryDetailsForStoreByCountry = async (
+  storeId: string,
+  countryId: string,
+) => {
+  // Get shipping rate
+  const [shippingRateRow] = await pool.query<RowDataPacket[]>(
+    "SELECT * FROM shipping_rates WHERE country_id = ? AND store_id = ? LIMIT 1",
+    [countryId, storeId],
+  );
+
+  let storeDetails;
+  if (shippingRateRow.length === 0) {
+    [storeDetails] = await pool.query<RowDataPacket[]>(
+      "SELECT default_delivery_time_min, default_delivery_time_max, default_shipping_service FROM stores WHERE id = ? ",
+      [storeId],
+    );
+  }
+
+  const shippingRate = shippingRateRow[0];
+  const store =
+    storeDetails && storeDetails.length > 0
+      ? (storeDetails[0] as RowDataPacket)
+      : undefined;
+
+  const shippingService = shippingRate
+    ? shippingRate.shipping_service
+    : store?.default_shipping_service;
+
+  const deliveryTimeMin = shippingRate
+    ? shippingRate.delivery_time_min
+    : store?.default_delivery_time_min;
+
+  const deliveryTimeMax = shippingRate
+    ? shippingRate.delivery_time_max
+    : store?.default_delivery_time_max;
+
+  return {
+    shippingService,
+    deliveryTimeMin,
+    deliveryTimeMax,
+  };
 };

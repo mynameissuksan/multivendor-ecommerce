@@ -1,4 +1,5 @@
 import CheckoutContainer from "@/components/store/checkout/container";
+import Header from "@/components/store/layout/header/header";
 import { pool } from "@/lib/config/db";
 import { CartModel } from "@/models/cart-model";
 import { Country } from "@/models/country-model";
@@ -41,6 +42,8 @@ const CheckoutPage = async () => {
     [user.id],
   );
 
+  if (cartRows.length === 0) return redirect("/cart");
+
   const cart = cartRows[0];
 
   const formatCart = {
@@ -72,6 +75,8 @@ const CheckoutPage = async () => {
     }),
   } as CartModel;
 
+  // console.log('total ==== ',formatCart.total);
+
   if (cart.length === 0) return redirect("/cart");
 
   const [countries] = await pool.query<RowDataPacket[]>(
@@ -82,15 +87,18 @@ const CheckoutPage = async () => {
   const address = await getUserShippingAddresses();
 
   return (
-    <div className="bg-[#f4f4f4] min-h-screen">
-      <div className="max-w-300 mx-auto py-5 px-2">
-        <CheckoutContainer
-          addresses={address}
-          cart={formatCart}
-          countries={countries as Country[]}
-        />
+    <>
+      <Header />
+      <div className="bg-[#f4f4f4] min-h-[calc(100vh-65px)]">
+        <div className="max-w-300 mx-auto py-5 px-2">
+          <CheckoutContainer
+            addresses={address}
+            cart={formatCart}
+            countries={countries as Country[]}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

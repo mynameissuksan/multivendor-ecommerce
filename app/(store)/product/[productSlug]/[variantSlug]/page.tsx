@@ -1,4 +1,7 @@
 import StoreCard from "@/components/store/cards/store-card";
+import CaegoriesHeader from "@/components/store/layout/categories-header/categories-header";
+import Footer from "@/components/store/layout/footer/footer";
+import Header from "@/components/store/layout/header/header";
 import ProductPageContainer from "@/components/store/product-page/container";
 import ProductDescription from "@/components/store/product-page/product-info/product-description";
 import ProductQuestions from "@/components/store/product-page/product-info/product-questions";
@@ -10,6 +13,7 @@ import ProductReviews from "@/components/store/product-page/reviews/product-revi
 import { Separator } from "@/components/ui/separator";
 import { getProductPageData, getProducts } from "@/queries/product";
 import { notFound, redirect } from "next/navigation";
+import { Toaster } from "sonner";
 
 interface PageProps {
   params: Promise<{ productSlug: string; variantSlug: string }>;
@@ -80,6 +84,8 @@ export default async function ProductVariantPage({
 
   return (
     <div>
+      <Header />
+      <CaegoriesHeader />
       <div className="max-w-412.5 mx-auto p-4 overflow-x-hidden">
         <ProductPageContainer
           productData={productData}
@@ -143,6 +149,11 @@ export default async function ProductVariantPage({
             count={6}
           />
         </ProductPageContainer>
+      </div>
+      {/* Footer */}
+      <div className="bg-red-200">
+        <Footer />
+        <Toaster position="top-center" />
       </div>
     </div>
   );

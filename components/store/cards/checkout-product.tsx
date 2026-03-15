@@ -75,7 +75,7 @@ export default function CheckoutProductCard({
                   <span>
                     <Truck className="w-4 inline-block text-[#01a971]" />
                     <span className="text-[#01a971] ml-1">
-                      {shipping_fee
+                      {shipping_fee && shipping_fee > 0
                         ? `$${Number(shipping_fee).toFixed(2)}`
                         : "Free Delivery"}
                     </span>

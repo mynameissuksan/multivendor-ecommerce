@@ -23,7 +23,7 @@ export default function CountryLanguageCurrenSelector({
 
   const handleCountryClick = async (country: string) => {
     // find the country data based on the selected country name
-    const countryData = COUNTRIES.find((c) => c.code === country);
+    const countryData = COUNTRIES.find((c) => c.name === country);
 
     if (countryData) {
       const data: Country = {
@@ -86,11 +86,12 @@ export default function CountryLanguageCurrenSelector({
                 open={show}
                 onToggle={() => setShow(!show)}
                 onChange={(value) => {
+                  console.log('value === ',value)
                   handleCountryClick(value);
                 }}
                 selectedValue={
                   (COUNTRIES.find(
-                    (option) => option.name === userCountry.name
+                    (option) => option.name === userCountry.name,
                   ) as SelectMenuOption) || COUNTRIES[0]
                 }
               />

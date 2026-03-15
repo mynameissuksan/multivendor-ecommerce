@@ -1,5 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
+
+import { getDeliveryDetailsForStoreByCountry } from "./product";
 
 import { pool } from "@/lib/config/db";
 import { CartProductType } from "@/lib/types";
@@ -14,8 +15,8 @@ import {
   FreeShippingModel,
 } from "@/models/shipping-model";
 import { ShippingAddressModel } from "@/models/shipping-address";
-import { Country } from "@/models/country-model";
 import { CartModel } from "@/models/cart-model";
+import { randomUUID } from "crypto";
 
 export const followStore = async (storeId: string) => {
   try {
@@ -127,12 +128,12 @@ export const saveUserCart = async (
         FROM products p
         INNER JOIN stores s ON s.id = p.store_id
         INNER JOIN products_variant v ON v.product_id = p.id AND v.id = ?
-        LEFT JOIN sizes z ON z.products_variant_id = v.id
+        LEFT JOIN sizes z ON z.products_variant_id = v.id AND z.id = ?
         LEFT JOIN product_variant_images i ON i.products_variant_id = v.id
         LEFT JOIN free_shippings fs ON fs.product_id = p.id
         WHERE p.id = ?
   `,
-          [variantId, productId],
+          [variantId, sizeId, productId],
         );
 
         const data = rows[0];
@@ -212,7 +213,8 @@ export const saveUserCart = async (
           shippingFee = details.shippingFee;
         }
 
-        const totalPrice = price * validQty + shippingFee;
+        const totalPrice =
+          Number(price) * Number(validQty) + Number(shippingFee);
 
         return {
           productId,
@@ -235,12 +237,12 @@ export const saveUserCart = async (
 
     // Recalculate the cart's total price and shipping fees
     const subTotal = validatedCartItems.reduce(
-      (acc, item) => acc + item.price * item.quantity,
+      (acc, item) => Number(acc) + Number(item.price) * Number(item.quantity),
       0,
     );
 
     const shippingFees = validatedCartItems.reduce(
-      (acc, item) => acc + item.shippingFee,
+      (acc, item) => Number(acc) + Number(item.shippingFee),
       0,
     );
 
@@ -443,26 +445,30 @@ export const placeOrder = async (
 
   if (!user) throw new Error("Unautorized.");
 
-  const [cartRows] = await pool.query<RowDataPacket[]>(
-    `SELECT carts.*, cart_items.*
+  const conn = await pool.getConnection();
+  await conn.beginTransaction();
+
+  try {
+    const [cartRows] = await pool.query<RowDataPacket[]>(
+      `SELECT carts.*, cart_items.*
      FROM carts  
      INNER JOIN cart_items ON carts.id = cart_items.cart_id
      WHERE carts.id = ?`,
-    [cartId],
-  );
+      [cartId],
+    );
 
-  const cart = cartRows as CartModel[];
+    const cart = cartRows as CartModel[];
 
-  if (cartRows.length === 0) throw new Error("Cart not found");
+    if (cartRows.length === 0) throw new Error("Cart not found");
 
-  // fetch product, variant and size data from the db for validation
-  const validatedCartItems = await Promise.all(
-    cart.map(async (cartProduct) => {
-      const { product_id, variant_id, size_id, quantity } = cartProduct;
+    // fetch product, variant and size data from the db for validation
+    const validatedCartItems = await Promise.all(
+      cart.map(async (cartProduct) => {
+        const { product_id, variant_id, size_id, quantity } = cartProduct;
 
-      // fetch the product, variant size from the db
-      const [rows] = await pool.query<RowDataPacket[]>(
-        `
+        // fetch the product, variant size from the db
+        const [rows] = await pool.query<RowDataPacket[]>(
+          `
         SELECT
           p.id  AS product_id,
           p.slug AS product_slug,
@@ -499,125 +505,289 @@ export const placeOrder = async (
         FROM products p
         INNER JOIN stores s ON s.id = p.store_id
         INNER JOIN products_variant v ON v.product_id = p.id AND v.id = ?
-        LEFT JOIN sizes z ON z.products_variant_id = v.id
+        LEFT JOIN sizes z ON z.products_variant_id = v.id AND z.id = ?
         LEFT JOIN product_variant_images i ON i.products_variant_id = v.id
         LEFT JOIN free_shippings fs ON fs.product_id = p.id
         WHERE p.id = ?
   `,
-        [variant_id, product_id],
-      );
-
-      const data = rows[0];
-
-      const [freeShippingRow] = await pool.query<RowDataPacket[]>(
-        "SELECT * FROM free_shipping_countries WHERE free_shipping_id = ?",
-        [data["free_shipping_id"]],
-      );
-
-      const storesMap = {
-        id: data["store_id"],
-        return_policy: data["return_policy"],
-        default_shipping_service: data["default_shipping_service"],
-        default_shipping_fee_per_kg: data["default_shipping_fee_per_kg"],
-        default_shipping_fee_per_item: data["default_shipping_fee_per_item"],
-        default_shipping_fee_for_addional_item:
-          data["default_shipping_fee_for_addional_item"],
-        default_shipping_fee_fixed: data["default_shipping_fee_fixed"],
-        default_delivery_time_min: data["default_delivery_time_min"],
-        default_delivery_time_max: data["default_delivery_time_max"],
-      } as StoreModelInput;
-
-      const freeShipppingMap = {
-        free_shipping_country: freeShippingRow as FreeShippingCountry[],
-      } as FreeShippingModel;
-
-      if (rows.length === 0 || data["size_id"] === null) {
-        throw new Error(
-          `Invalid product, variant, or size combiation for product id ${product_id}, variant id ${variant_id} size id ${size_id}`,
+          [variant_id, size_id, product_id],
         );
-      }
+        const data = rows[0];
 
-      // Validate stock and price
-      const validQty = Math.min(quantity, data["quantity"]);
-
-      const price = data["discount"]
-        ? Number(data["price"]) -
-          Number(data["price"]) * (Number(data["discount"]) / 100)
-        : Number(data["price"]);
-
-      // calculate shipping details
-      const countryId = shippingAddress.country_id;
-
-      const [temp_country] = await pool.query<RowDataPacket[]>(
-        "SELECT id FROM countries WHERE id = ? LIMIT 1",
-        [countryId],
-      );
-
-      if (temp_country.length === 0)
-        throw new Error("Failded  to get shipping details for order");
-
-      let details = {
-        shippingFee: 0,
-        extraShippingFee: 0,
-        isFreeShipping: false,
-      };
-
-      const country = {
-        name: temp_country[0].name,
-        code: temp_country[0].code,
-        city: "",
-      };
-
-      if (country) {
-        const temp_details = await getShippingDetails(
-          data["shipping_fee_method"],
-          country,
-          storesMap,
-          freeShipppingMap,
+        const [freeShippingRow] = await pool.query<RowDataPacket[]>(
+          "SELECT * FROM free_shipping_countries WHERE free_shipping_id = ?",
+          [data["free_shipping_id"]],
         );
 
-        if (typeof temp_details !== "boolean") {
-          details = temp_details;
+        const storesMap = {
+          id: data["store_id"],
+          return_policy: data["return_policy"],
+          default_shipping_service: data["default_shipping_service"],
+          default_shipping_fee_per_kg: data["default_shipping_fee_per_kg"],
+          default_shipping_fee_per_item: data["default_shipping_fee_per_item"],
+          default_shipping_fee_for_addional_item:
+            data["default_shipping_fee_for_addional_item"],
+          default_shipping_fee_fixed: data["default_shipping_fee_fixed"],
+          default_delivery_time_min: data["default_delivery_time_min"],
+          default_delivery_time_max: data["default_delivery_time_max"],
+        } as StoreModelInput;
+
+        const freeShipppingMap = {
+          free_shipping_country: freeShippingRow as FreeShippingCountry[],
+        } as FreeShippingModel;
+
+        if (rows.length === 0 || data["size_id"] === null) {
+          throw new Error(
+            `Invalid product, variant, or size combiation for product id ${product_id}, variant id ${variant_id} size id ${size_id}`,
+          );
         }
+
+        // Validate stock and price
+        const validQty = Math.min(quantity, data["quantity"]);
+
+        const price = data["discount"]
+          ? Number(data["price"]) -
+            Number(data["price"]) * (Number(data["discount"]) / 100)
+          : Number(data["price"]);
+
+        // calculate shipping details
+        const countryId = shippingAddress.country_id;
+
+        const [temp_country] = await pool.query<RowDataPacket[]>(
+          "SELECT id, name, code FROM countries WHERE id = ? LIMIT 1",
+          [countryId],
+        );
+
+        if (temp_country.length === 0)
+          throw new Error("Failded  to get shipping details for order");
+
+        let details = {
+          shippingFee: 0,
+          extraShippingFee: 0,
+          isFreeShipping: false,
+        };
+
+        const country = {
+          name: temp_country[0].name,
+          code: temp_country[0].code,
+          city: "",
+        };
+
+        if (country) {
+          const temp_details = await getShippingDetails(
+            data["shipping_fee_method"],
+            country,
+            storesMap,
+            freeShipppingMap,
+          );
+
+          if (typeof temp_details !== "boolean") {
+            details = temp_details;
+          }
+        }
+
+        let shippingFee = 0;
+        const shippingFeeMethod = data["shipping_fee_method"];
+        if (shippingFeeMethod === "ITEM") {
+          shippingFee =
+            quantity === 1
+              ? details.shippingFee
+              : Number(details.shippingFee) +
+                Number(details.extraShippingFee) * Number(quantity - 1);
+        } else if (shippingFeeMethod === "WEIGHT") {
+          shippingFee =
+            Number(details.shippingFee) *
+            Number(data["weight"]) *
+            Number(quantity);
+        } else if (shippingFeeMethod === "FIXED") {
+          shippingFee = details.shippingFee;
+        }
+
+        const totalPrice =
+          Number(price) * Number(validQty) + Number(shippingFee);
+
+        return {
+          productId: product_id,
+          variantId: variant_id,
+          productSlug: data["product_slug"],
+          variantSlug: data["variant_slug"],
+          sizeId: size_id,
+          storeId: data["store_id"],
+          sku: data["sku"],
+          name: `${data["product_name"]} - ${data["variant_name"]}`,
+          images: data["image_url"] as string,
+          size: data["size"],
+          quantity: validQty,
+          price,
+          shippingFee,
+          totalPrice: totalPrice.toFixed(2),
+        };
+      }),
+    );
+
+    // console.log("validate", validatedCartItems);
+
+    // Define the type for grouped items by store
+    type GroupItems = { [StoreDetails: string]: typeof validatedCartItems };
+
+    // Group validated items by store
+    const groupItems = validatedCartItems.reduce<GroupItems>((acc, items) => {
+      if (!acc[items.storeId]) acc[items.storeId] = [];
+      acc[items.storeId].push(items);
+      return acc;
+    }, {} as GroupItems);
+
+    // console.log("groupItems = ", groupItems);
+
+    // create the order
+
+    const orderId = randomUUID();
+
+    conn.query<ResultSetHeader>(
+      `
+      INSERT INTO orders 
+      (id, shipping_fees, sub_total, total, order_status, payment_status, shipping_address_id, user_id) 
+      VALUES (?,?, ?, ?, ?, ?, ?, ?) `,
+      [orderId, 0, 0, 0, "Pending", "Pending", shippingAddress.id, user.id],
+    );
+
+    // Iterate over each store's items and create OrderGroup and OrderItems
+    let orderTotalPrice = 0;
+    let orderShippingFee = 0;
+
+    for (const [storeId, items] of Object.entries(groupItems)) {
+      const orderGroupId = randomUUID();
+      // Calculate store-specific totals
+      const groupedTotalPrice = items.reduce((acc, item) => {
+        return acc + Number(item.totalPrice);
+      }, 0);
+
+      // Calculate store-specific shippingFees
+      const groupedShippingFees = items.reduce(
+        (acc, item) => Number(acc) + Number(item.shippingFee),
+        0,
+      );
+
+      const subTotal = Number(groupedTotalPrice) - Number(groupedShippingFees);
+      // console.log('subTotal = ',subTotal, groupedTotalPrice , groupedShippingFees)
+
+      const { shippingService, deliveryTimeMax, deliveryTimeMin } =
+        await getDeliveryDetailsForStoreByCountry(
+          storeId,
+          shippingAddress.country_id,
+        );
+
+      // Create and OrderGroup for this store
+      conn.query<ResultSetHeader>(
+        `INSERT INTO order_group
+      (id, order_status, shipping_service, shipping_delivery_min, shipping_delivery_max, shipping_fees, sub_total, total, order_id, store_id) 
+       VALUES (? ,?, ?, ?, ?, ?, ?, ?, ?, ?) `,
+        [
+          orderGroupId,
+          "Pending", // order_status
+          shippingService || "Global Delivery", // shipping_service
+          deliveryTimeMax || 30, // shipping_delivery_min
+          deliveryTimeMin || 7, // shipping_shipping_max
+          groupedShippingFees, // shipping_fees
+          subTotal, // sub_total
+          groupedTotalPrice, // total
+          orderId, // order_id
+          storeId, // store_id
+        ],
+      );
+
+      // Create OrderItems  for this OrderGroup
+      for (const item of items) {
+        conn.query<ResultSetHeader>(
+          `INSERT INTO order_items 
+          (product_id, variant_id, size_id, product_slug, variant_slug, sku, name, image, size, quantity, shipping_fee, price, order_group_id, total_price) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) `,
+          [
+            item.productId, // product_id
+            item.variantId, // variant_id
+            item.sizeId, // size_id
+            item.productSlug, // product_slug
+            item.variantSlug, // variant_slug
+            item.sku, // sku
+            item.name, // name,
+            item.images, // image
+            item.size, // size
+            item.quantity, // quantity
+            item.shippingFee, // shipping_fee
+            item.price, // price
+            orderGroupId, // order_group_id
+            item.totalPrice,
+          ],
+        );
       }
 
-      let shippingFee = 0;
-      const shippingFeeMethod = data["shipping_fee_method"];
-      if (shippingFeeMethod === "ITEM") {
-        shippingFee =
-          quantity === 1
-            ? details.shippingFee
-            : Number(details.shippingFee) +
-              Number(details.extraShippingFee) * Number(quantity - 1);
-      } else if (shippingFeeMethod === "WEIGHT") {
-        shippingFee =
-          Number(details.shippingFee) *
-          Number(data["weight"]) *
-          Number(quantity);
-      } else if (shippingFeeMethod === "FIXED") {
-        shippingFee = details.shippingFee;
-      }
+      // update order totals
+      orderTotalPrice += groupedTotalPrice;
+      orderShippingFee += groupedShippingFees;
+    }
 
-      const totalPrice = price * validQty + shippingFee;
+    // Update the main order with the final totals
+    conn.query<ResultSetHeader>(
+      "UPDATE orders SET sub_total = ?, total = ?, shipping_fees = ? WHERE id = ?",
+      [
+        orderTotalPrice - orderShippingFee,
+        orderTotalPrice,
+        orderShippingFee,
+        orderId,
+      ],
+    );
 
-      return {
-        productId: product_id,
-        variantId: variant_id,
-        productSlug: data["product_slug"],
-        variantSlug: data["variant_slug"],
-        sizeId: size_id,
-        storeId: data["store_id"],
-        sku: data["sku"],
-        name: `${data["product_name"]} - ${data["variant_name"]}`,
-        images: data["image_url"],
-        size: data["size"],
-        quantity: validQty,
-        price,
-        shippingFee,
-        totalPrice,
-      };
+    // the first commit orders, order group, order items to db
+    await conn.commit();
+
+    return {
+      ok: true,
+      orderId,
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+};
+
+export const emptyUserCart = async () => {
+  try {
+    const user = await currentUser();
+
+    if (!user) throw new Error("Unauthroized.");
+
+    const userId = user.id;
+
+    await pool.query<ResultSetHeader>("DELETE FROM carts WHERE user_id = ?", [
+      userId,
+    ]);
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateCartWithLatest = async (cartProduct: CartProductType[]) => {
+  // Fetch product, variant, and size data form the db for validation
+  const validatedCartItems = await Promise.all(
+    cartProduct.map(async (cart) => {
+      const { productId, variantId, sizeId, quantity } = cart;
+
+      // Fetch the product, variant size from db
+      const [rows] = await pool.query<RowDataPacket[]>(
+        `SELECT 
+        p.*,
+        
+        FROM products p
+        INNER JOIN products_variant pv ON p.id = pv.product_id AND pv.id = ?
+        INNER JOIN sizes s ON s.products_variant_id = pv.id AND s.id = ?
+        INNER JOIN stores st ON p.store_id = st.id
+        LEFT JOIN free_shippings fs ON p.id = fs.product_id
+        LEFT JOIN free_shipping_countries fsc ON fs.id = fsc.free_shipping_id
+        WHERE p.id = ? LIMIT 1`,
+      );
     }),
   );
-
-  console.log("validate", validatedCartItems);
 };

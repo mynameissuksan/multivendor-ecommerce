@@ -44,7 +44,7 @@ const CartSummary: React.FC<Props> = ({ cartItems, shippingFees }) => {
   return (
     <div className="relative py-2 px-6 bg-white">
       <h1 className="text-gray-900 text-2xl font-bold mb-4">Summary</h1>
-      <div className="mt-4 font-medium flex items-center text-[#222] text-sm">
+      <div className="mt-4 font-medium flex items-center text-[#222] text-sm border-b">
         <h2 className="overflow-hidden whitespace-normal text-ellipsis break-normal">
           Subtotal
         </h2>
@@ -57,7 +57,7 @@ const CartSummary: React.FC<Props> = ({ cartItems, shippingFees }) => {
         </h3>
       </div>
 
-      <div className="mt-4 font-medium flex items-center text-[#222] text-sm">
+      <div className="mt-4 font-medium flex items-center text-[#222] text-sm border-b">
         <h2 className="overflow-hidden whitespace-normal text-ellipsis break-normal">
           Shipping Fees
         </h2>
@@ -70,7 +70,20 @@ const CartSummary: React.FC<Props> = ({ cartItems, shippingFees }) => {
         </h3>
       </div>
 
-      <div className="mt-4  flex items-center text-[#222] text-xl font-bold">
+      <div className="mt-4 font-medium flex items-center text-[#222] text-sm border-b">
+        <h2 className="overflow-hidden whitespace-normal text-ellipsis break-normal">
+          Taxes
+        </h2>
+        <h3 className="flex-1 w-0 min-w-0 text-right">
+          <span className="px-0.5 text-2xl text-black">
+            <div className="text-black text-xl inline-block break-all">
+              + 0.00
+            </div>
+          </span>
+        </h3>
+      </div>
+
+      <div className="mt-4  flex items-center text-[#222] text-xl font-bold border-b">
         <h2 className="overflow-hidden whitespace-normal text-ellipsis break-normal">
           Total
         </h2>

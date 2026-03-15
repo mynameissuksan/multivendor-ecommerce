@@ -14,7 +14,10 @@ import React from "react";
 import FastDelivery from "./fast-delivery";
 import { SecurityPrivacyCard } from "../product-page/shipping/returns-security-privacy-card";
 import { toast } from "sonner";
-import { placeOrder } from "@/queries/user";
+import { emptyUserCart, placeOrder } from "@/queries/user";
+
+import { useCartStore } from "@/cart-store/useCartStore";
+import { useRouter } from "next/navigation";
 
 const PlaceOrderCard: React.FC<Props> = ({
   shippingAddress,
@@ -23,13 +26,21 @@ const PlaceOrderCard: React.FC<Props> = ({
   total,
   cartId,
 }) => {
+  const router = useRouter();
+
+  const emptyCart = useCartStore((state) => state.emptyCart);
+
   const handlePlaceOrder = async () => {
     if (!shippingAddress) {
       toast.error("Select a shipping address first!");
     } else {
       try {
         const res = await placeOrder(shippingAddress, cartId);
-        // console.log('cartId = ',cartId)
+        if (res.ok) {
+          emptyCart();
+          await emptyUserCart();
+          router.push(`/order/${res.orderId}`);
+        }
       } catch (error: any) {
         toast.error("Something went wrong! ", error);
       }
